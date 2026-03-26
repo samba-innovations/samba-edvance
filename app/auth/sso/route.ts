@@ -29,7 +29,9 @@ export async function GET(request: NextRequest) {
     const cookieStore = await cookies()
     cookieStore.set(COOKIE_NAME, jwt, cookieOptions())
 
-    return NextResponse.redirect(new URL('/dashboard', request.url))
+    const proto = request.headers.get('x-forwarded-proto') ?? 'https'
+    const host = request.headers.get('x-forwarded-host') ?? request.headers.get('host') ?? 'localhost'
+    return NextResponse.redirect(`${proto}://${host}/dashboard`)
   } catch {
     return NextResponse.redirect(new URL('/login?error=sso', request.url))
   }
