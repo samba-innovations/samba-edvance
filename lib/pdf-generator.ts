@@ -459,19 +459,24 @@ function segmentsHeight(doc: Doc, segs: MathSegment[], width: number): number {
   return h;
 }
 
+// Altura máx de imagem no enunciado: 20% da área útil (~126 pt ≈ 4.4 cm)
+const MAX_STEM_IMG_H = (PAGE_H - COL_TOP_FIRST - MB - FOOTER_H) * 0.2;
+// Altura máx de imagem em alternativa: 3.5 cm (menor para não dominar a página)
+const MAX_OPT_IMG_H  = 3.5 * CM;
+const MAX_OPT_IMG_W  = COL_W * 0.85;
+
 function questionBlockHeight(doc: Doc, rq: RenderedQuestion): number {
   let h = 0;
   h += strH(doc, `Questão ${rq.number}`, { font: F_BOLD, fontSize: F_SIZE, width: COL_W }) + 1;
-  const maxImgH = (PAGE_H - COL_TOP_FIRST - MB - FOOTER_H) * 0.2;
   for (const src of rq.images ?? []) {
-    if (resolveImg(src)) h += maxImgH + 0.15 * CM;
+    if (resolveImg(src)) h += MAX_STEM_IMG_H + 0.15 * CM;
   }
   h += segmentsHeight(doc, rq.stemSegments, COL_W) + 0.15 * CM;
   for (const opt of rq.optionSegments) {
     const lw = strW(doc, `${opt.label}) `, { font: F_NORM, size: F_SIZE });
     h += segmentsHeight(doc, opt.segments, COL_W - lw) + 2;
     for (const src of opt.images ?? []) {
-      if (resolveImg(src)) h += maxImgH + 0.15 * CM;
+      if (resolveImg(src)) h += MAX_OPT_IMG_H + 0.3 * CM;
     }
   }
   h += 0.4 * CM;
@@ -543,15 +548,14 @@ function drawQuestion(doc: Doc, rq: RenderedQuestion, x: number, startY: number)
   y += strH(doc, `Questão ${rq.number}`, { font: F_BOLD, fontSize: F_SIZE, width: COL_W }) + 1;
   doc.restore();
 
-  // Imagens do enunciado (vindas do DOCX)
-  const maxW = COL_W * 0.85;
-  const maxH = (PAGE_H - COL_TOP_FIRST - MB - FOOTER_H) * 0.2;
+  // Imagens do enunciado (vindas do DOCX ou manual)
+  const maxStemW = COL_W * 0.85;
   for (const src of rq.images ?? []) {
     const imgPath = resolveImg(src);
     if (imgPath) {
       try {
         const dim = _doc(doc).openImage(imgPath);
-        const scale = Math.min(maxW / dim.width, maxH / dim.height, 1);
+        const scale = Math.min(maxStemW / dim.width, MAX_STEM_IMG_H / dim.height, 1);
         const iw = dim.width * scale, ih = dim.height * scale;
         doc.image(imgPath, x, y, { width: iw, height: ih });
         y += ih + 0.15 * CM;
@@ -573,13 +577,14 @@ function drawQuestion(doc: Doc, rq: RenderedQuestion, x: number, startY: number)
     doc.restore();
     const optStartY = y;
     y = drawSegments(doc, opt.segments, x + lw, y, textW);
-    // Render images for this option
+    // Imagens da alternativa — texto/fórmula primeiro, imagem abaixo com espaço
+    if ((opt.images ?? []).some(src => resolveImg(src))) y += 0.15 * CM;
     for (const src of opt.images ?? []) {
       const imgPath = resolveImg(src);
       if (imgPath) {
         try {
           const dim = _doc(doc).openImage(imgPath);
-          const scale = Math.min(maxW / dim.width, maxH / dim.height, 1);
+          const scale = Math.min(MAX_OPT_IMG_W / dim.width, MAX_OPT_IMG_H / dim.height, 1);
           const iw = dim.width * scale, ih = dim.height * scale;
           doc.image(imgPath, x + lw, y, { width: iw, height: ih });
           y += ih + 0.15 * CM;
@@ -622,21 +627,39 @@ function drawQuestionsSection(doc: Doc, exam: ExamData, questions: RenderedQuest
   const xL = ML;
   const xR = ML + COL_W + COL_GAP;
 
+  const FULL_COL_H = COL_BOT - COL_TOP_OTHER;
+
   for (const q of questions) {
     doc.font(F_NORM).fontSize(F_SIZE);
     const bh = questionBlockHeight(doc, q);
 
-    if ((col === 0 ? y1 : y2) + bh > COL_BOT) {
-      if (col === 0 && y2 + bh <= COL_BOT) {
-        col = 1;
-      } else {
-        doc.addPage({ size: "A4" });
-        pageNum++;
-        drawFooter(doc, pageNum);
-        y1 = COL_TOP_OTHER;
-        y2 = COL_TOP_OTHER;
-        col = 0;
+    // Se a questão cabe em uma única coluna, tenta encaixar sem quebrar
+    const fitsCols = bh <= FULL_COL_H;
+
+    if (fitsCols) {
+      const curY = col === 0 ? y1 : y2;
+      if (curY + bh > COL_BOT) {
+        // Não cabe na coluna atual — tenta a outra coluna da mesma página
+        if (col === 0 && y2 + bh <= COL_BOT) {
+          col = 1;
+        } else {
+          // Nova página
+          doc.addPage({ size: "A4" });
+          pageNum++;
+          drawFooter(doc, pageNum);
+          y1 = COL_TOP_OTHER;
+          y2 = COL_TOP_OTHER;
+          col = 0;
+        }
       }
+    } else {
+      // Questão muito alta (imagens grandes) — sempre coloca na col esquerda de nova página
+      doc.addPage({ size: "A4" });
+      pageNum++;
+      drawFooter(doc, pageNum);
+      y1 = COL_TOP_OTHER;
+      y2 = COL_TOP_OTHER;
+      col = 0;
     }
 
     const newY = drawQuestion(doc, q, col === 0 ? xL : xR, col === 0 ? y1 : y2);
