@@ -104,9 +104,6 @@ export async function latexToPng(
 
     svg = svg.replace(/width="[\d.]+ex"/, `width="${pxW}"`);
     svg = svg.replace(/height="[\d.]+ex"/, `height="${pxH}"`);
-    // Inject explicit white background rect as first child of <svg>
-    svg = svg.replace(/(<svg[^>]*>)/, `$1<rect width="100%" height="100%" fill="white"/>`);
-
     // ── Sanitise SVG for librsvg (used by sharp) ──────────────────────────
     // 1. Strip all data-* attributes (non-standard XML)
     svg = svg.replace(/\s+data-[a-zA-Z0-9_-]+="[^"]*"/g, "");
@@ -120,15 +117,19 @@ export async function latexToPng(
     if (!svg.includes('xmlns=')) {
       svg = svg.replace(/^<svg/, '<svg xmlns="http://www.w3.org/2000/svg"');
     }
+    // 5. Replace currentColor with explicit black so librsvg renders glyphs correctly
+    svg = svg.replace(/fill="currentColor"/g, 'fill="#000000"');
+    svg = svg.replace(/stroke="currentColor"/g, 'stroke="#000000"');
+    // 6. Inject white background rect as first child
+    svg = svg.replace(/(<svg[^>]*>)/, `$1<rect width="${pxW}" height="${pxH}" fill="#ffffff"/>`);
 
-    // Flatten alpha → white so PDFKit embeds an opaque PNG (transparent PNGs
-    // appear black in some PDF viewers / PDFKit rendering paths).
-    const buffer: Buffer = await (
-      sharp as (input: Buffer) => {
-        flatten: (opts: object) => { png: () => { toBuffer: () => Promise<Buffer> } }
-      }
-    )(Buffer.from(svg))
-      .flatten({ background: { r: 255, g: 255, b: 255 } })
+    // Render SVG → PNG via sharp/librsvg, composite over white to remove any alpha
+    const svgBuffer = Buffer.from(svg);
+    const whiteBg = await (sharp as any)({
+      create: { width: pxW, height: pxH, channels: 3, background: { r: 255, g: 255, b: 255 } }
+    }).png().toBuffer();
+    const buffer: Buffer = await (sharp as any)(whiteBg)
+      .composite([{ input: svgBuffer, gravity: 'northwest' }])
       .png()
       .toBuffer();
     return { buffer, widthPt, heightPt };
