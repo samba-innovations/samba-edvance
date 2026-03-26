@@ -123,13 +123,9 @@ export async function latexToPng(
     // 6. Inject white background rect as first child
     svg = svg.replace(/(<svg[^>]*>)/, `$1<rect width="${pxW}" height="${pxH}" fill="#ffffff"/>`);
 
-    // Render SVG → PNG via sharp/librsvg, composite over white to remove any alpha
-    const svgBuffer = Buffer.from(svg);
-    const whiteBg = await (sharp as any)({
-      create: { width: pxW, height: pxH, channels: 3, background: { r: 255, g: 255, b: 255 } }
-    }).png().toBuffer();
-    const buffer: Buffer = await (sharp as any)(whiteBg)
-      .composite([{ input: svgBuffer, gravity: 'northwest' }])
+    // Render SVG → PNG via sharp/librsvg, flatten alpha onto white background
+    const buffer: Buffer = await (sharp as any)(Buffer.from(svg))
+      .flatten({ background: { r: 255, g: 255, b: 255 } })
       .png()
       .toBuffer();
     return { buffer, widthPt, heightPt };

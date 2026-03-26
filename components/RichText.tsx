@@ -36,6 +36,10 @@ function parseSegments(text: string): Segment[] {
         i = end + 1;
         continue;
       }
+      // No closing $ — treat as literal text
+      segs.push({ type: "text", content: "$" });
+      i++;
+      continue;
     }
     // Plain text up to next $
     const next = text.indexOf("$", i);
