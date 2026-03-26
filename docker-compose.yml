@@ -1,0 +1,31 @@
+# =============================================================================
+# samba edvance — App container
+# Requer: samba-db rodando (docker compose up -d em samba-db/)
+# =============================================================================
+#
+# Uso:
+#   docker compose up -d          → sobe o app
+#   docker compose down           → para
+#   docker compose logs -f app    → logs em tempo real
+#   docker compose up -d --build  → rebuild da imagem
+
+services:
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: samba_edvance_app
+    env_file: .env.docker
+    ports:
+      - "3003:3003"
+    volumes:
+      - ./public/uploads:/app/public/uploads
+    restart: unless-stopped
+    networks:
+      - samba_network
+
+networks:
+  samba_network:
+    external: true
+    name: samba_network

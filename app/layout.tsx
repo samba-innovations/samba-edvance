@@ -7,8 +7,30 @@ import { Toaster } from "sonner";
 const outfit = Outfit({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "samba edvance",
-  description: "Plataforma de gestão integrada de ocorrências para a rede pública de SP.",
+  title: {
+    default: "samba edvance",
+    template: "%s | samba edvance",
+  },
+  description: "Plataforma de simulados, avaliações e gestão pedagógica para professores e coordenadores.",
+  keywords: ["simulados", "avaliações", "gestão pedagógica", "BNCC", "escola", "professores"],
+  authors: [{ name: "samba" }],
+  creator: "samba",
+  openGraph: {
+    type: "website",
+    locale: "pt_BR",
+    siteName: "samba edvance",
+    title: "samba edvance",
+    description: "Plataforma de simulados, avaliações e gestão pedagógica para professores e coordenadores.",
+  },
+  twitter: {
+    card: "summary",
+    title: "samba edvance",
+    description: "Plataforma de simulados, avaliações e gestão pedagógica para professores e coordenadores.",
+  },
+  robots: {
+    index: false,
+    follow: false,
+  },
 };
 
 export default function RootLayout({

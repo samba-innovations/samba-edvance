@@ -5,7 +5,7 @@ import { ArrowRight, CheckCircle2, Plus } from "lucide-react";
 
 export function Hero() {
   return (
-    <section className="relative min-h-[100dvh] flex items-center pt-28 pb-16 lg:pt-32 overflow-hidden bg-background">
+    <section className="relative min-h-dvh flex items-center pt-28 pb-16 lg:pt-32 overflow-hidden bg-background">
       {/* Animated Organic Background Orbs */}
       {/* Blob 1 — só translate no motion, blur no filho estático */}
       <motion.div

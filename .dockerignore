@@ -1,0 +1,12 @@
+.next
+node_modules
+.env*
+!.env.docker
+*.log
+.git
+*.xlsx
+*.docx
+*.csv
+README.md
+AGENTS.md
+CLAUDE.md

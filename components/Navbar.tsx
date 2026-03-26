@@ -33,7 +33,7 @@ export function Navbar() {
         <motion.nav
           initial={{ y: -100, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
-          transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
+          transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] as [number, number, number, number] }}
           className={cn(
             "pointer-events-auto w-full max-w-7xl rounded-[2rem] transition-all duration-500 overflow-hidden",
             scrolled

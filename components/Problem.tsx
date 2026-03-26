@@ -76,7 +76,7 @@ export function Problem() {
                 </div>
                 <div className="h-12 bg-muted rounded-xl w-1/2 shadow-sm"></div>
 
-                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rotate-[10deg] bg-destructive text-destructive-foreground px-8 py-4 rounded-full font-bold shadow-2xl border-4 border-card text-lg whitespace-nowrap">
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rotate-[10deg] bg-destructive text-white px-8 py-4 rounded-full font-bold shadow-2xl border-4 border-card text-lg whitespace-nowrap">
                   Sem Padronização
                 </div>
               </div>

@@ -1,0 +1,441 @@
+// =============================================================================
+// Prisma Schema — samba-edvance
+// Acessa samba_school (leitura) + samba_edvance (leitura/escrita)
+// =============================================================================
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["multiSchema"]
+  binaryTargets   = ["native", "debian-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  schemas  = ["samba_school", "samba_edvance"]
+}
+
+// ─── samba_school (leitura) ────────────────────────────────────────────────
+
+model User {
+  id                 Int                    @id @default(autoincrement())
+  name               String                 @db.VarChar(100)
+  email              String                 @unique @db.VarChar(150)
+  passwordHash       String                 @map("password_hash") @db.VarChar(255)
+  isActive           Boolean                @default(true) @map("is_active")
+  mustChangePassword Boolean                @default(false) @map("must_change_password")
+  avatarUrl          String?                @map("avatar_url")
+  bio                String?                @db.VarChar(200)
+  createdAt          DateTime               @default(now()) @map("created_at")
+  userRoles          UserRole[]
+  ssoTokens          SsoToken[]
+  items              Item[]
+  blueprints         Blueprint[]
+  exams              Exam[]
+  teacherAssignments TeacherClassSubject[]
+  examTeacherAssigns ExamTeacherAssignment[]
+  examProgress       ExamTeacherProgress[]
+  questions          Question[]
+  notifications      Notification[]
+
+  @@map("users")
+  @@schema("samba_school")
+}
+
+model Role {
+  id        Int        @id @default(autoincrement())
+  name      String     @unique @db.VarChar(50)
+  userRoles UserRole[]
+
+  @@map("roles")
+  @@schema("samba_school")
+}
+
+model UserRole {
+  userId Int  @map("user_id")
+  roleId Int  @map("role_id")
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role   Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+  @@map("user_roles")
+  @@schema("samba_school")
+}
+
+model SsoToken {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    Int      @map("user_id")
+  target    String   @db.VarChar(50)
+  used      Boolean  @default(false)
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sso_tokens")
+  @@schema("samba_school")
+}
+
+model Discipline {
+  id                     Int                    @id @default(autoincrement())
+  name                   String                 @db.VarChar(100)
+  items                  Item[]
+  teacherAssignments     TeacherClassSubject[]
+  examTeacherAssignments ExamTeacherAssignment[]
+  examDisciplineQuotas   ExamDisciplineQuota[]
+  examProgress           ExamTeacherProgress[]
+  questions              Question[]
+
+  @@map("disciplines")
+  @@schema("samba_school")
+}
+
+model SchoolGrade {
+  id          Int          @id @default(autoincrement())
+  level       String       @db.VarChar(20)
+  yearNumber  Int          @map("year_number")
+  label       String       @db.VarChar(50)
+  schoolClasses SchoolClass[]
+
+  @@unique([level, yearNumber])
+  @@map("school_grades")
+  @@schema("samba_school")
+}
+
+model ClassSection {
+  id           Int           @id @default(autoincrement())
+  label        String        @unique @db.VarChar(10)
+  schoolClasses SchoolClass[]
+
+  @@map("class_sections")
+  @@schema("samba_school")
+}
+
+model SchoolClass {
+  id                     Int                    @id @default(autoincrement())
+  gradeId                Int?                   @map("grade_id")
+  sectionId              Int?                   @map("section_id")
+  name                   String                 @db.VarChar(100)
+  grade                  SchoolGrade?           @relation(fields: [gradeId], references: [id])
+  section                ClassSection?          @relation(fields: [sectionId], references: [id])
+  exams                  Exam[]
+  teacherAssignments     TeacherClassSubject[]
+  examClassAssignments   ExamClassAssignment[]
+  examTeacherAssignments ExamTeacherAssignment[]
+  examProgress           ExamTeacherProgress[]
+  questions              Question[]
+
+  @@map("school_classes")
+  @@schema("samba_school")
+}
+
+model Student {
+  id             Int             @id @default(autoincrement())
+  name           String          @db.VarChar(150)
+  studentAnswers StudentAnswer[]
+
+  @@map("students")
+  @@schema("samba_school")
+}
+
+/// Mapeia professor → turma → disciplina (cadastro institucional)
+model TeacherClassSubject {
+  id           Int        @id @default(autoincrement())
+  userId       Int        @map("user_id")
+  classId      Int        @map("class_id")
+  disciplineId Int        @map("discipline_id")
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  class        SchoolClass @relation(fields: [classId], references: [id], onDelete: Cascade)
+  discipline   Discipline  @relation(fields: [disciplineId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, classId, disciplineId])
+  @@map("teacher_assignments")
+  @@schema("samba_school")
+}
+
+// ─── samba_edvance ────────────────────────────────────────────────────────
+
+model Skill {
+  id            Int             @id @default(autoincrement())
+  code          String          @unique @db.VarChar(20)
+  description   String
+  area          String?         @db.VarChar(100)
+  level         String?         @db.VarChar(50)
+  items         Item[]
+  questionSkills QuestionSkill[]
+
+  @@map("skills")
+  @@schema("samba_edvance")
+}
+
+model Item {
+  id            Int            @id @default(autoincrement())
+  ownerId       Int?           @map("owner_id")
+  disciplineId  Int            @map("discipline_id")
+  skillId       Int?           @map("skill_id")
+  serie         String         @db.VarChar(20)
+  difficulty    Difficulty
+  itemType      ItemType       @map("item_type")
+  stem          String
+  optionsJson   String?        @map("options_json")
+  numericAnswer String?        @map("numeric_answer") @db.VarChar(50)
+  mediaUrl      String?        @map("media_url") @db.VarChar(255)
+  latex         Boolean        @default(false)
+  createdAt     DateTime       @default(now()) @map("created_at")
+  owner         User?          @relation(fields: [ownerId], references: [id], onDelete: SetNull)
+  discipline    Discipline     @relation(fields: [disciplineId], references: [id], onDelete: Cascade)
+  skill         Skill?         @relation(fields: [skillId], references: [id], onDelete: SetNull)
+  examQuestions ExamQuestion[]
+
+
+
+  @@map("items")
+  @@schema("samba_edvance")
+}
+
+model Blueprint {
+  id          Int      @id @default(autoincrement())
+  name        String   @db.VarChar(200)
+  description String?
+  ownerId     Int?     @map("owner_id")
+  configJson  String   @map("config_json")
+  createdAt   DateTime @default(now()) @map("created_at")
+  owner       User?    @relation(fields: [ownerId], references: [id], onDelete: SetNull)
+  exams       Exam[]
+
+  @@map("blueprints")
+  @@schema("samba_edvance")
+}
+
+model Exam {
+  id                     Int                    @id @default(autoincrement())
+  title                  String                 @db.VarChar(200)
+  area                   String?                @db.VarChar(100)
+  classId                Int?                   @map("class_id")
+  blueprintId            Int?                   @map("blueprint_id")
+  status                 ExamStatus             @default(draft)
+  optionsCount           Int                    @default(4) @map("options_count")
+  answerSource           String                 @default("teachers") @map("answer_source")
+  createdBy              Int?                   @map("created_by")
+  openedAt               DateTime?              @map("opened_at")
+  closedAt               DateTime?              @map("closed_at")
+  createdAt              DateTime               @default(now()) @map("created_at")
+  schoolClass            SchoolClass?           @relation(fields: [classId], references: [id], onDelete: SetNull)
+  blueprint              Blueprint?             @relation(fields: [blueprintId], references: [id], onDelete: SetNull)
+  creator                User?                  @relation(fields: [createdBy], references: [id], onDelete: SetNull)
+  questions              ExamQuestion[]
+  studentAnswers         StudentAnswer[]
+  classAssignments       ExamClassAssignment[]
+  disciplineQuotas       ExamDisciplineQuota[]
+  teacherAssignments     ExamTeacherAssignment[]
+  teacherProgress        ExamTeacherProgress[]
+  progressLog            ExamProgressLog[]
+  submittedQuestions     Question[]
+
+  @@map("exams")
+  @@schema("samba_edvance")
+}
+
+model ExamClassAssignment {
+  id      Int         @id @default(autoincrement())
+  examId  Int         @map("exam_id")
+  classId Int         @map("class_id")
+  exam    Exam        @relation(fields: [examId], references: [id], onDelete: Cascade)
+  class   SchoolClass @relation(fields: [classId], references: [id], onDelete: Cascade)
+
+  @@unique([examId, classId])
+  @@map("exam_class_assignments")
+  @@schema("samba_edvance")
+}
+
+model ExamDisciplineQuota {
+  id           Int        @id @default(autoincrement())
+  examId       Int        @map("exam_id")
+  disciplineId Int        @map("discipline_id")
+  quota        Int        @default(0)
+  exam         Exam       @relation(fields: [examId], references: [id], onDelete: Cascade)
+  discipline   Discipline @relation(fields: [disciplineId], references: [id], onDelete: Cascade)
+
+  @@unique([examId, disciplineId])
+  @@map("exam_discipline_quotas")
+  @@schema("samba_edvance")
+}
+
+model ExamTeacherAssignment {
+  id           Int         @id @default(autoincrement())
+  examId       Int         @map("exam_id")
+  classId      Int         @map("class_id")
+  disciplineId Int         @map("discipline_id")
+  teacherId    Int         @map("teacher_id")
+  exam         Exam        @relation(fields: [examId], references: [id], onDelete: Cascade)
+  class        SchoolClass @relation(fields: [classId], references: [id], onDelete: Cascade)
+  discipline   Discipline  @relation(fields: [disciplineId], references: [id], onDelete: Cascade)
+  teacher      User        @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+
+  @@unique([examId, classId, disciplineId])
+  @@map("exam_teacher_assignments")
+  @@schema("samba_edvance")
+}
+
+model ExamTeacherProgress {
+  id           Int         @id @default(autoincrement())
+  examId       Int         @map("exam_id")
+  teacherId    Int         @map("teacher_id")
+  disciplineId Int         @map("discipline_id")
+  classId      Int         @map("class_id")
+  quota        Int         @default(0)
+  submitted    Int         @default(0)
+  status       String      @default("pending") @db.VarChar(20)
+  updatedAt    DateTime    @default(now()) @updatedAt @map("updated_at")
+  exam         Exam        @relation(fields: [examId], references: [id], onDelete: Cascade)
+  teacher      User        @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  discipline   Discipline  @relation(fields: [disciplineId], references: [id], onDelete: Cascade)
+  class        SchoolClass @relation(fields: [classId], references: [id], onDelete: Cascade)
+
+  @@unique([examId, teacherId, disciplineId, classId])
+  @@map("exam_teacher_progress")
+  @@schema("samba_edvance")
+}
+
+model ExamProgressLog {
+  id           Int      @id @default(autoincrement())
+  examId       Int      @map("exam_id")
+  teacherId    Int?     @map("teacher_id")
+  disciplineId Int?     @map("discipline_id")
+  classId      Int?     @map("class_id")
+  questionId   Int?     @map("question_id")
+  eventType    String   @map("event_type") @db.VarChar(30)
+  quotaBefore  Int?     @map("quota_before")
+  quotaAfter   Int?     @map("quota_after")
+  submittedSnap Int?    @map("submitted_snap")
+  createdAt    DateTime @default(now()) @map("created_at")
+  exam         Exam     @relation(fields: [examId], references: [id], onDelete: Cascade)
+
+  @@map("exam_progress_log")
+  @@schema("samba_edvance")
+}
+
+/// Questões submetidas pelos professores para um simulado específico
+model Question {
+  id           Int              @id @default(autoincrement())
+  examId       Int              @map("exam_id")
+  teacherId    Int              @map("teacher_id")
+  disciplineId Int              @map("discipline_id")
+  classId      Int              @map("class_id")
+  stem         String
+  state        String           @default("submitted") @db.VarChar(20)
+  source       String           @default("manual") @db.VarChar(20)
+  correctLabel String?          @map("correct_label") @db.VarChar(5)
+  latex        Boolean          @default(false)
+  createdAt    DateTime         @default(now()) @map("created_at")
+  exam         Exam             @relation(fields: [examId], references: [id], onDelete: Cascade)
+  teacher      User             @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  discipline   Discipline       @relation(fields: [disciplineId], references: [id], onDelete: Cascade)
+  class        SchoolClass      @relation(fields: [classId], references: [id], onDelete: Cascade)
+  options        QuestionOption[]
+  questionSkills QuestionSkill[]
+
+  @@map("questions")
+  @@schema("samba_edvance")
+}
+
+model QuestionSkill {
+  questionId Int      @map("question_id")
+  skillId    Int      @map("skill_id")
+  question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  skill      Skill    @relation(fields: [skillId], references: [id], onDelete: Cascade)
+
+  @@id([questionId, skillId])
+  @@map("question_skills")
+  @@schema("samba_edvance")
+}
+
+model QuestionOption {
+  id         Int      @id @default(autoincrement())
+  questionId Int      @map("question_id")
+  label      String   @db.VarChar(5)
+  text       String
+  question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@unique([questionId, label])
+  @@map("question_options")
+  @@schema("samba_edvance")
+}
+
+model ExamQuestion {
+  id              Int             @id @default(autoincrement())
+  examId          Int             @map("exam_id")
+  itemId          Int             @map("item_id")
+  position        Int
+  answerKey       String?         @map("answer_key") @db.VarChar(10)
+  exam            Exam            @relation(fields: [examId], references: [id], onDelete: Cascade)
+  item            Item            @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  studentAnswers  StudentAnswer[]
+
+  @@unique([examId, position])
+  @@map("exam_questions")
+  @@schema("samba_edvance")
+}
+
+model StudentAnswer {
+  id          Int          @id @default(autoincrement())
+  examId      Int          @map("exam_id")
+  studentId   Int          @map("student_id")
+  questionId  Int          @map("question_id")
+  answer      String?      @db.VarChar(10)
+  isCorrect   Boolean?     @map("is_correct")
+  answeredAt  DateTime     @default(now()) @map("answered_at")
+  exam        Exam         @relation(fields: [examId], references: [id], onDelete: Cascade)
+  student     Student      @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  question    ExamQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@unique([examId, studentId, questionId])
+  @@map("student_answers")
+  @@schema("samba_edvance")
+}
+
+// ─── Enums ────────────────────────────────────────────────────────────────
+
+enum Difficulty {
+  EASY
+  MEDIUM
+  HARD
+
+  @@schema("samba_edvance")
+}
+
+enum ItemType {
+  MULTIPLE_CHOICE
+  DISCURSIVE
+  NUMERIC
+
+  @@schema("samba_edvance")
+}
+
+enum ExamStatus {
+  draft
+  collecting
+  review
+  locked
+  generated
+  published
+  archived
+  open
+  closed
+  graded
+
+  @@schema("samba_edvance")
+}
+
+model Notification {
+  id        Int      @id @default(autoincrement())
+  userId    Int      @map("user_id")
+  title     String   @db.VarChar(200)
+  message   String?
+  link      String?  @db.VarChar(500)
+  isRead    Boolean  @default(false) @map("is_read")
+  createdAt DateTime @default(now()) @map("created_at")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notifications")
+  @@schema("samba_edvance")
+}
