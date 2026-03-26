@@ -104,8 +104,8 @@ export async function latexToPng(
 
     svg = svg.replace(/width="[\d.]+ex"/, `width="${pxW}"`);
     svg = svg.replace(/height="[\d.]+ex"/, `height="${pxH}"`);
-    // Merge white background into existing style attribute
-    svg = svg.replace(/style="([^"]*)"/, `style="$1; background: white;"`);
+    // Inject explicit white background rect as first child of <svg>
+    svg = svg.replace(/(<svg[^>]*>)/, `$1<rect width="100%" height="100%" fill="white"/>`);
 
     // ── Sanitise SVG for librsvg (used by sharp) ──────────────────────────
     // 1. Strip all data-* attributes (non-standard XML)
