@@ -722,15 +722,22 @@ export async function uploadManualImage(
     return { error: "Formato não suportado. Use PNG, JPG ou WebP." };
   }
 
-  const uploadDir = path.join(process.cwd(), "public", "uploads", `exam-${examId}`, "manual");
-  fs.mkdirSync(uploadDir, { recursive: true });
+  if (file.size === 0) return { error: "Arquivo vazio." };
 
-  const filename = `img_${Date.now()}${ext}`;
-  const dest = path.join(uploadDir, filename);
-  const buffer = Buffer.from(await file.arrayBuffer());
-  fs.writeFileSync(dest, buffer);
+  try {
+    const uploadDir = path.join(process.cwd(), "public", "uploads", `exam-${examId}`, "manual");
+    fs.mkdirSync(uploadDir, { recursive: true });
 
-  return { success: "Imagem enviada.", url: `/uploads/exam-${examId}/manual/${filename}` };
+    const filename = `img_${Date.now()}${ext}`;
+    const dest = path.join(uploadDir, filename);
+    const buffer = Buffer.from(await file.arrayBuffer());
+    fs.writeFileSync(dest, buffer);
+
+    return { success: "Imagem enviada.", url: `/uploads/exam-${examId}/manual/${filename}` };
+  } catch (e: any) {
+    console.error("[uploadManualImage]", e);
+    return { error: `Erro ao salvar imagem: ${e?.message ?? "desconhecido"}` };
+  }
 }
 
 export async function submeterQuestaoParaTurmas(data: {
