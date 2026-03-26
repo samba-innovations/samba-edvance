@@ -61,18 +61,18 @@ export async function excluirDisciplina(id: number): Promise<ActionResult> {
 export async function getHabilidades(disciplineId?: number) {
   if (disciplineId) {
     return prisma.$queryRaw<Array<{ id: number; code: string; description: string; discipline_id: number; discipline_name: string }>>`
-      SELECT s.id, s.code, s.description, s.discipline_id, d.name AS discipline_name
+      SELECT s.id, s.code, s.description, d.id AS discipline_id, d.name AS discipline_name
       FROM samba_edvance.skills s
-      JOIN samba_school.disciplines d ON d.id = s.discipline_id
-      WHERE s.discipline_id = ${disciplineId}
+      JOIN samba_school.disciplines d ON d.name = s.area
+      WHERE d.id = ${disciplineId}
       ORDER BY s.code
     `;
   }
   return prisma.$queryRaw<Array<{ id: number; code: string; description: string; discipline_id: number; discipline_name: string }>>`
-    SELECT s.id, s.code, s.description, s.discipline_id, d.name AS discipline_name
+    SELECT s.id, s.code, s.description, d.id AS discipline_id, d.name AS discipline_name
     FROM samba_edvance.skills s
-    JOIN samba_school.disciplines d ON d.id = s.discipline_id
-    ORDER BY d.name, s.code
+    LEFT JOIN samba_school.disciplines d ON d.name = s.area
+    ORDER BY s.area, s.code
   `;
 }
 
@@ -89,8 +89,10 @@ export async function criarHabilidade(
 
   try {
     await prisma.$executeRaw`
-      INSERT INTO samba_edvance.skills (code, description, discipline_id)
-      VALUES (${code}, ${description}, ${disciplineId})
+      INSERT INTO samba_edvance.skills (code, description, area)
+      SELECT ${code}, ${description}, name
+      FROM samba_school.disciplines
+      WHERE id = ${disciplineId}
     `;
     revalidatePath("/dashboard/disciplinas");
     return { success: "Habilidade criada." };
