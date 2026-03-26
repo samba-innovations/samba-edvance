@@ -312,9 +312,6 @@ export async function removerAtribuicaoProfessor(
 // ─── Questões submetidas (visão do coordenador) ───────────────────────────────
 
 export async function getExamQuestions(examId: number) {
-  await prisma.$executeRaw`
-    ALTER TABLE samba_edvance.questions ADD COLUMN IF NOT EXISTS images TEXT NOT NULL DEFAULT '[]'
-  `;
   return prisma.$queryRaw<Array<{
     id: number; stem: string; state: string; source: string;
     correct_label: string | null; created_at: Date;
@@ -592,9 +589,6 @@ export async function getMyAssignments(examId: number, teacherId: number) {
 }
 
 export async function getMyQuestions(examId: number, teacherId: number) {
-  await prisma.$executeRaw`
-    ALTER TABLE samba_edvance.questions ADD COLUMN IF NOT EXISTS images TEXT NOT NULL DEFAULT '[]'
-  `;
   return prisma.$queryRaw<Array<{
     id: number; stem: string; state: string; correct_label: string | null;
     created_at: Date; discipline_name: string; class_name: string;
@@ -752,9 +746,6 @@ export async function submeterQuestaoParaTurmas(data: {
   if (!data.stem?.trim()) return { error: "Enunciado é obrigatório." };
   if (data.targets.length === 0) return { error: "Selecione pelo menos uma turma." };
 
-  await prisma.$executeRaw`
-    ALTER TABLE samba_edvance.questions ADD COLUMN IF NOT EXISTS images TEXT NOT NULL DEFAULT '[]'
-  `;
 
   const imagesJson = JSON.stringify(data.images ?? []);
   let inserted = 0;
@@ -876,10 +867,6 @@ export async function importarQuestoesDocx(data: {
   if (data.targets.length === 0) return { error: "Selecione pelo menos uma turma." };
 
   // Garante coluna images
-  await prisma.$executeRaw`
-    ALTER TABLE samba_edvance.questions
-      ADD COLUMN IF NOT EXISTS images TEXT NOT NULL DEFAULT '[]'
-  `;
 
   let inserted = 0;
 

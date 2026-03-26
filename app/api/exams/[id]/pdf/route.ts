@@ -48,11 +48,6 @@ export async function GET(req: NextRequest, { params }: Params) {
     return NextResponse.json({ error: "Simulado não encontrado." }, { status: 404 });
   }
 
-  // Garante coluna images
-  await prisma.$executeRaw`
-    ALTER TABLE samba_edvance.questions ADD COLUMN IF NOT EXISTS images TEXT NOT NULL DEFAULT '[]'
-  `;
-
   // ── Busca questões aprovadas ──────────────────────────────────────────────
   const filteredRows = classId
     ? await prisma.$queryRaw<Array<{
