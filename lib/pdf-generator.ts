@@ -140,7 +140,7 @@ function processText(text: string): string {
 
 // ─── Rendered question (pre-rendered math → PNG buffers) ──────────────────────
 
-interface RenderedOption { label: string; segments: MathSegment[] }
+interface RenderedOption { label: string; segments: MathSegment[]; images?: string[] }
 
 interface RenderedQuestion {
   number: number;
@@ -158,6 +158,7 @@ async function preRenderQuestion(q: QuestionData, colWidth: number): Promise<Ren
       (q.options || []).map(async opt => ({
         label: opt.label,
         segments: await renderMathSegments(opt.text || "", colWidth * 0.9),
+        images: opt.images ?? [],
       }))
     ),
     images: q.images,
@@ -177,7 +178,7 @@ export interface ExamData {
 export interface QuestionData {
   number: number;
   stem: string;
-  options: Array<{ label: string; text: string }>;
+  options: Array<{ label: string; text: string; images?: string[] }>;
   correct_label?: string | null;
   images?: string[];
 }
@@ -469,6 +470,9 @@ function questionBlockHeight(doc: Doc, rq: RenderedQuestion): number {
   for (const opt of rq.optionSegments) {
     const lw = strW(doc, `${opt.label}) `, { font: F_NORM, size: F_SIZE });
     h += segmentsHeight(doc, opt.segments, COL_W - lw) + 2;
+    for (const src of opt.images ?? []) {
+      if (resolveImg(src)) h += maxImgH + 0.15 * CM;
+    }
   }
   h += 0.4 * CM;
   return h;
@@ -569,6 +573,19 @@ function drawQuestion(doc: Doc, rq: RenderedQuestion, x: number, startY: number)
     doc.restore();
     const optStartY = y;
     y = drawSegments(doc, opt.segments, x + lw, y, textW);
+    // Render images for this option
+    for (const src of opt.images ?? []) {
+      const imgPath = resolveImg(src);
+      if (imgPath) {
+        try {
+          const dim = _doc(doc).openImage(imgPath);
+          const scale = Math.min(maxW / dim.width, maxH / dim.height, 1);
+          const iw = dim.width * scale, ih = dim.height * scale;
+          doc.image(imgPath, x + lw, y, { width: iw, height: ih });
+          y += ih + 0.15 * CM;
+        } catch { /* ignora */ }
+      }
+    }
     if (y === optStartY) y += F_SIZE + 2; // empty option fallback
     y += 2;
   }

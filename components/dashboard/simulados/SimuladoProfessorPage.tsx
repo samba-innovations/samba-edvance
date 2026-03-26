@@ -610,14 +610,17 @@ function ManualForm({ simulado, assignments, embedded }: ManualFormProps) {
 
   async function handleSend(targets: Array<{ classId: number; disciplineId: number }>) {
     setSubmitting(true);
-    const allImages = [...stemImages, ...optImages.flat()];
+    const structuredImages = {
+      stem: stemImages,
+      options: Object.fromEntries(options.map((opt, i) => [opt.label, optImages[i] ?? []])),
+    };
     const res = await submeterQuestaoParaTurmas({
       examId: simulado.id,
       targets,
       stem: stem.trim(),
       correctLabel,
       options,
-      images: allImages,
+      images: structuredImages,
     });
     setSubmitting(false);
     setShowModal(false);

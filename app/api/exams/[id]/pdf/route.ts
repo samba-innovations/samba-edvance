@@ -100,14 +100,29 @@ export async function GET(req: NextRequest, { params }: Params) {
 
   // Monta lista de questões numeradas
   const questions: QuestionData[] = filteredRows.map((r, i) => {
-    let images: string[] = [];
-    try { images = JSON.parse(r.images ?? "[]"); } catch { /* */ }
+    let stemImages: string[] = [];
+    let optionImagesMap: Record<string, string[]> = {};
+    try {
+      const parsed = JSON.parse(r.images ?? "[]");
+      if (Array.isArray(parsed)) {
+        // Formato legado: array plano — tudo vai para o enunciado
+        stemImages = parsed;
+      } else if (parsed && typeof parsed === "object" && "stem" in parsed) {
+        // Formato estruturado
+        stemImages = parsed.stem ?? [];
+        optionImagesMap = parsed.options ?? {};
+      }
+    } catch { /* */ }
     return {
       number: i + 1,
       stem: r.stem,
       correct_label: r.correct_label,
-      options: optMap.get(r.id) ?? [],
-      images,
+      options: (optMap.get(r.id) ?? []).map(opt => ({
+        label: opt.label,
+        text: opt.text,
+        images: optionImagesMap[opt.label] ?? [],
+      })),
+      images: stemImages,
     };
   });
 

@@ -746,7 +746,7 @@ export async function submeterQuestaoParaTurmas(data: {
   stem: string;
   correctLabel: string | null;
   options: Array<{ label: string; text: string }>;
-  images?: string[];
+  images?: string[] | { stem: string[]; options: Record<string, string[]> };
 }): Promise<ActionResult & { count?: number }> {
   const session = await getSession();
   if (!session) return { error: "Não autenticado." };
