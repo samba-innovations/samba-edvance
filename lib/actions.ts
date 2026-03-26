@@ -597,7 +597,6 @@ export async function getTurmaById(id: number) {
 }
 
 export async function getTurmaStudents(classId: number) {
-  await ensureColumns();
   return prisma.$queryRaw<Array<{
     id: number; ra: string; dig_ra: string | null; name: string; is_active: boolean; call_number: number | null;
   }>>`
@@ -635,14 +634,6 @@ export async function getTurmaSimulados(classId: number) {
 
 // ─── Alunos ───────────────────────────────────────────────────────────────────
 
-/** Garante que as colunas extras existem (idempotente). */
-async function ensureColumns() {
-  await prisma.$executeRaw`
-    ALTER TABLE samba_school.students
-      ADD COLUMN IF NOT EXISTS call_number INTEGER,
-      ADD COLUMN IF NOT EXISTS dig_ra      VARCHAR(4)
-  `;
-}
 
 type AlunoRow = {
   id: number; ra: string; dig_ra: string | null; name: string;
@@ -650,7 +641,6 @@ type AlunoRow = {
 };
 
 export async function getAlunos(search?: string, classId?: number): Promise<AlunoRow[]> {
-  await ensureColumns();
   if (classId && search) {
     return prisma.$queryRaw<AlunoRow[]>`
       SELECT s.id, s.ra, s.dig_ra, s.name, c.name AS class_name, s.is_active, s.call_number
@@ -705,7 +695,6 @@ export async function importarAlunosCSV(
   if (!classId) return { error: "Selecione uma turma." };
   if (!file)    return { error: "Selecione um arquivo CSV." };
 
-  await ensureColumns();
 
   const text = await file.text();
   const lines = text.split(/\r?\n/).map(l => l.trim());
