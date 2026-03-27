@@ -465,9 +465,9 @@ function segmentsHeight(doc: Doc, segs: MathSegment[], width: number): number {
 
 // Altura máx de imagem no enunciado: 20% da área útil (~126 pt ≈ 4.4 cm)
 const MAX_STEM_IMG_H = (PAGE_H - COL_TOP_FIRST - MB - FOOTER_H) * 0.2;
-// Altura máx de imagem em alternativa: 3.5 cm — imagem centralizada na largura total da coluna
-const MAX_OPT_IMG_H  = 3.5 * CM;
-const MAX_OPT_IMG_W  = COL_W * 0.95; // usa quase toda a coluna (centralizado)
+// Altura máx de imagem em alternativa: 2.0 cm — reduzido para não ocupar coluna inteira
+const MAX_OPT_IMG_H  = 2.0 * CM;
+const MAX_OPT_IMG_W  = COL_W * 0.60; // até 60% da coluna, centralizado
 
 function questionBlockHeight(doc: Doc, rq: RenderedQuestion): number {
   let h = 0;
@@ -650,12 +650,11 @@ function drawQuestionsSection(doc: Doc, exam: ExamData, questions: RenderedQuest
     if (fitsCols) {
       const curY = col === 0 ? y1 : y2;
       if (curY + bh > COL_BOT) {
-        // Não cabe na coluna atual
-        if (!q.hasOptionImages && col === 0 && y2 + bh <= COL_BOT) {
-          // Questões sem imagens em alternativas: pode ir para coluna direita
+        // Não cabe na coluna atual — tenta coluna direita (com ou sem imagens)
+        if (col === 0 && y2 + bh <= COL_BOT) {
           col = 1;
         } else {
-          // Questões COM imagens em alternativas (ou coluna direita também cheia): nova página
+          // Nenhuma coluna comporta: nova página
           doc.addPage({ size: "A4" });
           pageNum++;
           drawFooter(doc, pageNum);
@@ -663,9 +662,6 @@ function drawQuestionsSection(doc: Doc, exam: ExamData, questions: RenderedQuest
           y2 = COL_TOP_OTHER;
           col = 0;
         }
-      } else if (q.hasOptionImages && col === 1) {
-        // Questão com imagem já está na coluna direita — permitido, mas deve caber inteira
-        // (já verificado acima); não força nova página
       }
     } else {
       // Questão muito alta (imagens grandes) — sempre coloca na col esquerda de nova página

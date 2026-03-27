@@ -1101,6 +1101,51 @@ export async function excluirMinhasQuestoes(examId: number): Promise<ActionResul
   }
 }
 
+// ─── Finalizar envios (professor) ─────────────────────────────────────────────
+
+export async function finalizarEnviosProfessor(examId: number): Promise<ActionResult> {
+  const session = await getSession();
+  if (!session) return { error: "Não autenticado." };
+  if (session.role !== "TEACHER") return { error: "Acesso restrito a professores." };
+
+  try {
+    // Marca todos os progresses do professor neste simulado como 'done'
+    await prisma.$executeRaw`
+      UPDATE samba_edvance.exam_teacher_progress
+      SET status = 'done', updated_at = NOW()
+      WHERE exam_id = ${examId} AND teacher_id = ${session.id}
+    `;
+
+    // Busca título do simulado para a notificação
+    const exams = await prisma.$queryRaw<[{ title: string; created_by: number | null }]>`
+      SELECT title, created_by FROM samba_edvance.exams WHERE id = ${examId}
+    `;
+    const exam = exams[0];
+    const link = `/dashboard/simulados/${examId}`;
+
+    if (exam?.created_by) {
+      await notifyUser(
+        exam.created_by,
+        `Professor finalizou envios`,
+        `${session.name} finalizou o envio de questões para o simulado "${exam.title}".`,
+        link
+      );
+    }
+    await notifyCoordinators(
+      `Professor finalizou envios`,
+      `${session.name} finalizou o envio de questões para o simulado "${exam?.title ?? examId}".`,
+      link
+    );
+
+    revalidatePath(`/dashboard/simulados/${examId}`);
+    revalidatePath("/dashboard");
+    return { success: "Envios finalizados. O coordenador foi notificado." };
+  } catch (e) {
+    console.error(e);
+    return { error: "Erro ao finalizar envios." };
+  }
+}
+
 // ─── Limpar todas as questões de um simulado ──────────────────────────────────
 
 export async function limparTodasQuestoes(examId: number): Promise<ActionResult> {

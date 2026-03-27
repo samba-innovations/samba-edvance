@@ -15,6 +15,7 @@ import {
   excluirMinhasQuestoes,
   parsearDocx,
   importarQuestoesDocx,
+  finalizarEnviosProfessor,
 } from "@/lib/exam-actions";
 import { getSkills, getExamSkills, setExamSkills } from "@/lib/skill-actions";
 import { toast } from "sonner";
@@ -971,6 +972,43 @@ function DeleteAllButton({ examId }: { examId: number }) {
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
+function FinalizarEnviosButton({ examId }: { examId: number }) {
+  const router = useRouter();
+  const { confirmDialog, askConfirm } = useConfirm();
+  const [pending, startTransition] = useTransition();
+
+  async function handleClick() {
+    if (!await askConfirm(
+      "Confirmar finalização dos envios? O coordenador será notificado e você voltará ao painel de simulados."
+    )) return;
+    startTransition(async () => {
+      const res = await finalizarEnviosProfessor(examId);
+      if (res.error) {
+        toast.error(res.error);
+      } else {
+        toast.success(res.success ?? "Envios finalizados!");
+        router.push("/dashboard/simulados");
+      }
+    });
+  }
+
+  return (
+    <>
+      {confirmDialog}
+      <button
+        onClick={handleClick}
+        disabled={pending}
+        className="w-full h-11 flex items-center justify-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-black transition-all disabled:opacity-60 active:scale-[0.99]"
+      >
+        {pending
+          ? <Loader2 size={15} className="animate-spin" />
+          : <Send size={15} />}
+        Finalizar Envios
+      </button>
+    </>
+  );
+}
+
 export function SimuladoProfessorPage({ simulado, assignments, questions, session }: {
   simulado: Simulado;
   assignments: Assignment[];
@@ -1103,6 +1141,11 @@ export function SimuladoProfessorPage({ simulado, assignments, questions, sessio
                 })}
               </div>
             </div>
+
+            {/* Finalizar envios */}
+            {isCollecting && questions.length > 0 && (
+              <FinalizarEnviosButton examId={simulado.id} />
+            )}
 
             {/* Habilidades BNCC */}
             {isCollecting && <ExamSkillsPicker examId={simulado.id} />}
