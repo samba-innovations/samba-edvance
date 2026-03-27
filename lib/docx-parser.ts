@@ -15,7 +15,7 @@ import path from "path";
 export type ParsedQuestion = {
   stem: string;
   correctLabel: string | null;
-  options: Array<{ label: string; text: string }>;
+  options: Array<{ label: string; text: string; images?: string[] }>;
   images: string[];
   /** Raw index in document, 0-based */
   index: number;
@@ -237,15 +237,23 @@ function ommlToLatex(xml: string): string {
     return `${latexChr}${limits}{${body}}`;
   });
 
-  // Delimiter: <m:d><m:dPr>...</m:dPr><m:e>...</m:e></m:d>
-  xml = xml.replace(/<m:d>([\s\S]*?)<\/m:d>/g, (_match: string, inner: string) => {
-    const begChrMatch = inner.match(/<m:begChr m:val="([^"]*)"/);
-    const endChrMatch = inner.match(/<m:endChr m:val="([^"]*)"/);
-    const beg = begChrMatch ? begChrMatch[1] : "(";
-    const end = endChrMatch ? endChrMatch[1] : ")";
-    const body = ommlToLatex(innerXml(inner, "m:e"));
-    return `\\left${beg}${body}\\right${end}`;
-  });
+  // Delimiter: <m:d>...</m:d>
+  // Use iterative innerXml instead of lazy regex — lazy regex breaks on nested <m:d> blocks.
+  {
+    let safetyLimit = 200;
+    while (xml.includes("<m:d>") && safetyLimit-- > 0) {
+      const dIdx = xml.indexOf("<m:d>");
+      if (dIdx === -1) break;
+      const inner = innerXml(xml.slice(dIdx), "m:d");
+      const fullTag = `<m:d>${inner}</m:d>`;
+      const begChrMatch = inner.match(/<m:begChr m:val="([^"]*)"/);
+      const endChrMatch = inner.match(/<m:endChr m:val="([^"]*)"/);
+      const beg = begChrMatch ? begChrMatch[1] : "(";
+      const end = endChrMatch ? endChrMatch[1] : ")";
+      const body = ommlToLatex(innerXml(inner, "m:e"));
+      xml = xml.slice(0, dIdx) + `\\left${beg}${body}\\right${end}` + xml.slice(dIdx + fullTag.length);
+    }
+  }
 
   // Math run text: <m:t>
   xml = xml.replace(/<m:t[^>]*>([\s\S]*?)<\/m:t>/g, (_match: string, text: string) => {
@@ -385,15 +393,15 @@ function extractParagraphs(docXml: string): Paragraph[] {
 
 const GABARITO_RE = /^\*?\s*gabarito\s*:\s*([A-Ea-e])\s*$/i;
 
-// Format A: "1. stem" → natural numbered questions
-const FORMAT_A_QUESTION = /^\d+[.)]\s+(.+)$/;
-// Format A: "a) text" → options
-const FORMAT_A_OPTION = /^([a-e])\)\s*(.+)$/i;
+// Format A: "1. stem" → natural numbered questions (também aceita sem espaço: "1.stem")
+const FORMAT_A_QUESTION = /^\d+[.)]\s*(.+)$/;
+// Format A: "a) text" → options (texto pode ser vazio — opção pode ser só imagem)
+const FORMAT_A_OPTION = /^([a-e])\)\s*(.*)$/i;
 
 // Format B: "Q: stem" or "Q) stem"
 const FORMAT_B_QUESTION = /^Q[:)]\s*(.+)$/i;
 // Format B: "A) text" → options
-const FORMAT_B_OPTION = /^([A-E])\)\s*(.+)$/;
+const FORMAT_B_OPTION = /^([A-E])\)\s*(.*)$/;
 
 function parseQuestions(paragraphs: Paragraph[]): Array<ParsedQuestion & { rawImageRids: string[] }> {
   const questions: Array<ParsedQuestion & { rawImageRids: string[] }> = [];
@@ -407,7 +415,7 @@ function parseQuestions(paragraphs: Paragraph[]): Array<ParsedQuestion & { rawIm
     let stem: string | null = null;
     let isFormatA = false;
     let isFormatB = false;
-    const questionImageRids: string[] = [...para.imageRids];
+    const stemImageRids: string[] = [...para.imageRids];
 
     if (line) {
       const matchA = line.match(FORMAT_A_QUESTION);
@@ -429,13 +437,13 @@ function parseQuestions(paragraphs: Paragraph[]): Array<ParsedQuestion & { rawIm
       if (GABARITO_RE.test(nextLine)) break;
       if (isFormatA && FORMAT_A_OPTION.test(nextLine)) break;
       if (isFormatB && FORMAT_B_OPTION.test(nextLine)) break;
-      // Images within the stem area belong to this question
-      questionImageRids.push(...next.imageRids);
+      // Images within the stem area belong to the stem
+      stemImageRids.push(...next.imageRids);
       if (nextLine) stem += " " + nextLine;
       i++;
     }
 
-    const options: Array<{ label: string; text: string }> = [];
+    const options: Array<{ label: string; text: string; optImageRids: string[] }> = [];
     let correctLabel: string | null = null;
 
     while (i < paragraphs.length) {
@@ -452,8 +460,8 @@ function parseQuestions(paragraphs: Paragraph[]): Array<ParsedQuestion & { rawIm
 
       if (opt) {
         let optText = opt[2].trim();
-        // Collect images within option paragraph
-        questionImageRids.push(...next.imageRids);
+        // Images in the option's own paragraph belong to this option
+        const optImageRids: string[] = [...next.imageRids];
         i++;
         // Multi-line option continuation
         while (i < paragraphs.length) {
@@ -463,11 +471,12 @@ function parseQuestions(paragraphs: Paragraph[]): Array<ParsedQuestion & { rawIm
           if (GABARITO_RE.test(contLine)) break;
           const isNextOpt = isFormatA ? FORMAT_A_OPTION.test(contLine) : FORMAT_B_OPTION.test(contLine);
           if (isNextOpt) break;
-          questionImageRids.push(...cont.imageRids);
+          // Continuation images also belong to this option
+          optImageRids.push(...cont.imageRids);
           if (contLine) optText += " " + contLine;
           i++;
         }
-        options.push({ label: opt[1].toUpperCase(), text: optText });
+        options.push({ label: opt[1].toUpperCase(), text: optText, optImageRids });
       } else {
         break;
       }
@@ -477,9 +486,10 @@ function parseQuestions(paragraphs: Paragraph[]): Array<ParsedQuestion & { rawIm
       questions.push({
         stem: stem.trim(),
         correctLabel,
-        options,
+        // carry images per option as raw rids — resolved in parseDocxBuffer
+        options: options.map(o => ({ label: o.label, text: o.text, images: [], _optImageRids: o.optImageRids } as any)),
         images: [],
-        rawImageRids: questionImageRids,
+        rawImageRids: stemImageRids,
         index: questions.length,
       });
     }
@@ -515,39 +525,56 @@ export async function parseDocxBuffer(
 
   const rawQuestions = parseQuestions(paragraphs);
 
-  // Save images per question
+  // Helper: save a single rId to disk, return public URL or null
+  const seenRidGlobal = new Map<string, string>(); // rId → public URL (dedup across questions)
   const uploadDir = path.join(process.cwd(), "public", "uploads", `exam-${examId}`);
   fs.mkdirSync(uploadDir, { recursive: true });
+
+  async function saveRid(rId: string, prefix: string): Promise<string | null> {
+    if (seenRidGlobal.has(rId)) return seenRidGlobal.get(rId)!;
+    const mediaFilename = rIdToFile.get(rId);
+    if (!mediaFilename) return null;
+    const zipPath = `word/media/${mediaFilename}`;
+    const zipFile = zip.files[zipPath];
+    if (!zipFile || zipFile.dir) return null;
+    const ext = path.extname(mediaFilename).toLowerCase();
+    if (![".png", ".jpg", ".jpeg", ".gif", ".webp"].includes(ext)) return null;
+    const destFilename = `${prefix}_${mediaFilename}`;
+    const destPath = path.join(uploadDir, destFilename);
+    const fileBuffer = await zipFile.async("nodebuffer");
+    fs.writeFileSync(destPath, fileBuffer);
+    const url = `/uploads/exam-${examId}/${destFilename}`;
+    seenRidGlobal.set(rId, url);
+    return url;
+  }
 
   const questions: ParsedQuestion[] = [];
 
   for (const rq of rawQuestions) {
-    const imagePaths: string[] = [];
-    const seenRids = new Set<string>();
-
+    // ── Stem images ─────────────────────────────────────────────────────────
+    const stemImages: string[] = [];
     for (const rId of rq.rawImageRids) {
-      if (seenRids.has(rId)) continue;
-      seenRids.add(rId);
+      const url = await saveRid(rId, `q${rq.index}_stem`);
+      if (url) stemImages.push(url);
+    }
 
-      const mediaFilename = rIdToFile.get(rId);
-      if (!mediaFilename) continue;
-
-      const zipPath = `word/media/${mediaFilename}`;
-      const zipFile = zip.files[zipPath];
-      if (!zipFile || zipFile.dir) continue;
-
-      const ext = path.extname(mediaFilename).toLowerCase();
-      if (![".png", ".jpg", ".jpeg", ".gif", ".webp"].includes(ext)) continue;
-
-      const destFilename = `q${rq.index}_${mediaFilename}`;
-      const destPath = path.join(uploadDir, destFilename);
-      const fileBuffer = await zipFile.async("nodebuffer");
-      fs.writeFileSync(destPath, fileBuffer);
-      imagePaths.push(`/uploads/exam-${examId}/${destFilename}`);
+    // ── Per-option images ────────────────────────────────────────────────────
+    const resolvedOptions: Array<{ label: string; text: string; images: string[] }> = [];
+    for (const opt of rq.options as any[]) {
+      const optImages: string[] = [];
+      for (const rId of (opt._optImageRids ?? []) as string[]) {
+        const url = await saveRid(rId, `q${rq.index}_opt${opt.label}`);
+        if (url) optImages.push(url);
+      }
+      resolvedOptions.push({ label: opt.label, text: opt.text, images: optImages });
     }
 
     const { rawImageRids: _rids, ...rest } = rq;
-    questions.push({ ...rest, images: imagePaths });
+    questions.push({
+      ...rest,
+      options: resolvedOptions,
+      images: stemImages,
+    });
   }
 
   return questions;

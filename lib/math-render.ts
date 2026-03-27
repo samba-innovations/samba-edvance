@@ -27,7 +27,9 @@ RegisterHTMLHandler(_adaptor);
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function newMjDoc(): any {
   return mathjax.document("", {
-    InputJax: new TeX({ packages: ["base", "ams", "boldsymbol"] }),
+    InputJax: new TeX({
+      packages: ["base", "ams", "boldsymbol", "mhchem", "noundefined"],
+    }),
     OutputJax: new SVG({ fontCache: "none" }),
   });
 }
@@ -94,7 +96,7 @@ export async function latexToPng(
     // Scale to fit column; display formulas may upscale up to 20%
     const scaleFactor = display
       ? Math.min(maxWidthPt / rawWidthPt, 1.2)
-      : Math.min((maxWidthPt * 0.55) / rawWidthPt, 1.0);
+      : Math.min((maxWidthPt * 0.85) / rawWidthPt, 1.0);
     const widthPt  = rawWidthPt  * scaleFactor;
     const heightPt = rawHeightPt * scaleFactor;
 
@@ -142,7 +144,7 @@ export async function latexToPng(
  * should be rendered in display mode so fractions and large operators are legible.
  */
 function needsDisplayMode(latex: string): boolean {
-  return /\\frac|\\dfrac|\\sum|\\prod|\\int|\\lim|\\binom|\\genfrac/.test(latex);
+  return /\\frac|\\dfrac|\\cfrac|\\tfrac|\\sum|\\prod|\\int|\\lim|\\binom|\\genfrac|\\displaystyle|\\underbrace|\\overbrace|\\overset|\\underset/.test(latex);
 }
 
 // ─── Unicode subscript / superscript → LaTeX (mirrors docx-parser logic) ──────

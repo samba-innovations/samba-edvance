@@ -148,21 +148,25 @@ interface RenderedQuestion {
   optionSegments: RenderedOption[];
   images?: string[];
   correct_label?: string | null;
+  /** true se qualquer alternativa tiver imagem — força início de coluna */
+  hasOptionImages: boolean;
 }
 
 async function preRenderQuestion(q: QuestionData, colWidth: number): Promise<RenderedQuestion> {
+  const optionSegments = await Promise.all(
+    (q.options || []).map(async opt => ({
+      label: opt.label,
+      segments: await renderMathSegments(opt.text || "", colWidth * 0.9),
+      images: opt.images ?? [],
+    }))
+  );
   return {
     number: q.number,
     stemSegments: await renderMathSegments(q.stem || "", colWidth),
-    optionSegments: await Promise.all(
-      (q.options || []).map(async opt => ({
-        label: opt.label,
-        segments: await renderMathSegments(opt.text || "", colWidth * 0.9),
-        images: opt.images ?? [],
-      }))
-    ),
+    optionSegments,
     images: q.images,
     correct_label: q.correct_label,
+    hasOptionImages: optionSegments.some(o => (o.images ?? []).length > 0),
   };
 }
 
@@ -461,9 +465,9 @@ function segmentsHeight(doc: Doc, segs: MathSegment[], width: number): number {
 
 // Altura máx de imagem no enunciado: 20% da área útil (~126 pt ≈ 4.4 cm)
 const MAX_STEM_IMG_H = (PAGE_H - COL_TOP_FIRST - MB - FOOTER_H) * 0.2;
-// Altura máx de imagem em alternativa: 3.5 cm (menor para não dominar a página)
+// Altura máx de imagem em alternativa: 3.5 cm — imagem centralizada na largura total da coluna
 const MAX_OPT_IMG_H  = 3.5 * CM;
-const MAX_OPT_IMG_W  = COL_W * 0.85;
+const MAX_OPT_IMG_W  = COL_W * 0.95; // usa quase toda a coluna (centralizado)
 
 function questionBlockHeight(doc: Doc, rq: RenderedQuestion): number {
   let h = 0;
@@ -475,8 +479,12 @@ function questionBlockHeight(doc: Doc, rq: RenderedQuestion): number {
   for (const opt of rq.optionSegments) {
     const lw = strW(doc, `${opt.label}) `, { font: F_NORM, size: F_SIZE });
     h += segmentsHeight(doc, opt.segments, COL_W - lw) + 2;
-    for (const src of opt.images ?? []) {
-      if (resolveImg(src)) h += MAX_OPT_IMG_H + 0.3 * CM;
+    const optImgs = (opt.images ?? []).filter(src => resolveImg(src));
+    if (optImgs.length > 0) {
+      h += 0.2 * CM; // espaço texto→imagem
+      for (const src of optImgs) {
+        if (resolveImg(src)) h += MAX_OPT_IMG_H + 0.25 * CM;
+      }
     }
   }
   h += 0.4 * CM;
@@ -577,18 +585,21 @@ function drawQuestion(doc: Doc, rq: RenderedQuestion, x: number, startY: number)
     doc.restore();
     const optStartY = y;
     y = drawSegments(doc, opt.segments, x + lw, y, textW);
-    // Imagens da alternativa — texto/fórmula primeiro, imagem abaixo com espaço
-    if ((opt.images ?? []).some(src => resolveImg(src))) y += 0.15 * CM;
-    for (const src of opt.images ?? []) {
-      const imgPath = resolveImg(src);
-      if (imgPath) {
+    // Imagens da alternativa — centralizadas na largura total da coluna, abaixo do texto
+    const optImgs = (opt.images ?? []).filter(src => resolveImg(src));
+    if (optImgs.length > 0) {
+      y += 0.2 * CM; // espaço entre texto e imagem
+      for (const src of optImgs) {
+        const imgPath = resolveImg(src)!;
         try {
           const dim = _doc(doc).openImage(imgPath);
           const scale = Math.min(MAX_OPT_IMG_W / dim.width, MAX_OPT_IMG_H / dim.height, 1);
           const iw = dim.width * scale, ih = dim.height * scale;
-          doc.image(imgPath, x + lw, y, { width: iw, height: ih });
-          y += ih + 0.15 * CM;
-        } catch { /* ignora */ }
+          // Centraliza na largura total da coluna (não apenas na área do texto)
+          const imgX = x + (COL_W - iw) / 2;
+          doc.image(imgPath, imgX, y, { width: iw, height: ih });
+          y += ih + 0.25 * CM;
+        } catch { /* ignora imagem corrompida */ }
       }
     }
     if (y === optStartY) y += F_SIZE + 2; // empty option fallback
@@ -639,11 +650,12 @@ function drawQuestionsSection(doc: Doc, exam: ExamData, questions: RenderedQuest
     if (fitsCols) {
       const curY = col === 0 ? y1 : y2;
       if (curY + bh > COL_BOT) {
-        // Não cabe na coluna atual — tenta a outra coluna da mesma página
-        if (col === 0 && y2 + bh <= COL_BOT) {
+        // Não cabe na coluna atual
+        if (!q.hasOptionImages && col === 0 && y2 + bh <= COL_BOT) {
+          // Questões sem imagens em alternativas: pode ir para coluna direita
           col = 1;
         } else {
-          // Nova página
+          // Questões COM imagens em alternativas (ou coluna direita também cheia): nova página
           doc.addPage({ size: "A4" });
           pageNum++;
           drawFooter(doc, pageNum);
@@ -651,6 +663,9 @@ function drawQuestionsSection(doc: Doc, exam: ExamData, questions: RenderedQuest
           y2 = COL_TOP_OTHER;
           col = 0;
         }
+      } else if (q.hasOptionImages && col === 1) {
+        // Questão com imagem já está na coluna direita — permitido, mas deve caber inteira
+        // (já verificado acima); não força nova página
       }
     } else {
       // Questão muito alta (imagens grandes) — sempre coloca na col esquerda de nova página
@@ -714,7 +729,54 @@ export async function buildBooklet(
   });
 }
 
-// ─── BUILD ANSWER SHEET ───────────────────────────────────────────────────────
+// ─── HELPER: Nomear arquivos PDF ──────────────────────────────────────────────
+
+/**
+ * Gera o nome do arquivo PDF conforme as convenções do sistema:
+ *
+ *  Modo individual (por aluno):
+ *    caderno  → Caderno_RA{ra}_Nome{primeiroNome}_{serie}.pdf
+ *    resposta → Resposta_RA{ra}_Nome{primeiroNome}_{serie}.pdf
+ *
+ *  Modo turma (lote):
+ *    Caderno_{serie}.pdf
+ *
+ *  Modo blank (em branco):
+ *    Caderno_{serie}_blank.pdf
+ *
+ * Caracteres inválidos para nome de arquivo são substituídos por "_".
+ */
+export function getPdfFilename(
+  type: "caderno" | "resposta",
+  mode: "individual" | "turma" | "blank",
+  opts?: { student?: StudentInfo; className?: string }
+): string {
+  const safe = (s: string) =>
+    (s ?? "")
+      .normalize("NFD").replace(/[\u0300-\u036f]/g, "")  // remove acentos
+      .replace(/[^a-zA-Z0-9_\-]/g, "_")
+      .replace(/_+/g, "_")
+      .replace(/^_|_$/g, "")
+      || "X";
+
+  if (mode === "individual" && opts?.student) {
+    const ra        = safe(opts.student.ra);
+    const firstName = safe(opts.student.name.split(" ")[0]);
+    const serie     = safe(opts.student.className);
+    const prefix    = type === "caderno" ? "Caderno" : "Resposta";
+    return `${prefix}_RA${ra}_Nome${firstName}_${serie}.pdf`;
+  }
+
+  const serie = safe(opts?.className ?? opts?.student?.className ?? "Turma");
+
+  if (mode === "turma") {
+    return `Caderno_${serie}.pdf`;
+  }
+
+  // blank
+  return `Caderno_${serie}_blank.pdf`;
+}
+
 
 /**
  * Gera folha(s) de respostas em PDF.

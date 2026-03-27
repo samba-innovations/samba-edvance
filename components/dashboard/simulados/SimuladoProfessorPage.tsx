@@ -21,6 +21,7 @@ import { toast } from "sonner";
 import { RichText } from "@/components/RichText";
 import { RichTextInput } from "@/components/RichTextInput";
 import { useConfirm } from "@/components/ConfirmDialog";
+import LatexEditor from "@/components/LatexEditor";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -603,6 +604,30 @@ function ManualForm({ simulado, assignments, embedded }: ManualFormProps) {
   const [error, setError] = useState("");
   const [showModal, setShowModal] = useState(false);
 
+  // LaTeX editor
+  const [showLatex, setShowLatex] = useState(false);
+  const [latexValue, setLatexValue] = useState("");
+  const [latexInline, setLatexInline] = useState(true);
+  const [latexTarget, setLatexTarget] = useState<"stem" | number>("stem");
+
+  function openLatexFor(target: "stem" | number) {
+    setLatexTarget(target);
+    setShowLatex(true);
+  }
+
+  function handleLatexInsert(full: string) {
+    if (latexTarget === "stem") {
+      setStem(s => s + full);
+    } else {
+      setOptions(prev => {
+        const next = [...prev];
+        next[latexTarget as number] = { ...next[latexTarget as number], text: next[latexTarget as number].text + full };
+        return next;
+      });
+    }
+    setLatexValue("");
+  }
+
   function validate() {
     if (!stem.trim()) { setError("Enunciado é obrigatório."); return false; }
     return true;
@@ -648,9 +673,22 @@ function ManualForm({ simulado, assignments, embedded }: ManualFormProps) {
         <div className={`${embedded ? "p-5" : "p-6"} space-y-5`}>
           {/* Enunciado */}
           <div className="space-y-1.5">
-            <label className="text-xs font-black text-muted-foreground uppercase tracking-wider">
-              Enunciado <span className="text-destructive">*</span>
-            </label>
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-black text-muted-foreground uppercase tracking-wider">
+                Enunciado <span className="text-destructive">*</span>
+              </label>
+              <button
+                type="button"
+                onClick={() => openLatexFor("stem")}
+                className={`text-[11px] px-2 py-0.5 rounded-md border transition-all ${
+                  showLatex && latexTarget === "stem"
+                    ? "border-primary text-primary bg-primary/5"
+                    : "border-border text-muted-foreground hover:border-primary/60 hover:text-primary"
+                }`}
+              >
+                √ LaTeX
+              </button>
+            </div>
             <RichTextInput
               value={stem}
               onChange={setStem}
@@ -661,6 +699,34 @@ function ManualForm({ simulado, assignments, embedded }: ManualFormProps) {
               placeholder="Digite o enunciado da questão... Use $formula$ para LaTeX."
             />
           </div>
+
+          {/* Painel LaTeX */}
+          {showLatex && (
+            <div className="rounded-xl border border-border/60 bg-muted/20 p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-black text-muted-foreground uppercase tracking-wider">
+                  Editor LaTeX →{" "}
+                  <span className="text-primary font-medium normal-case">
+                    {latexTarget === "stem" ? "Enunciado" : `Alternativa ${options[latexTarget as number]?.label}`}
+                  </span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setShowLatex(false)}
+                  className="text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+              <LatexEditor
+                value={latexValue}
+                onChange={setLatexValue}
+                inline={latexInline}
+                onModeChange={setLatexInline}
+                onInsert={handleLatexInsert}
+              />
+            </div>
+          )}
 
           {/* Alternativas */}
           <div className="space-y-3">
@@ -679,7 +745,20 @@ function ManualForm({ simulado, assignments, embedded }: ManualFormProps) {
                   }`}>
                   {opt.label}
                 </button>
-                <div className="flex-1">
+                <div className="flex-1 space-y-1">
+                  <div className="flex justify-end">
+                    <button
+                      type="button"
+                      onClick={() => openLatexFor(i)}
+                      className={`text-[10px] px-1.5 py-0.5 rounded border transition-all ${
+                        showLatex && latexTarget === i
+                          ? "border-primary text-primary bg-primary/5"
+                          : "border-border/50 text-muted-foreground/60 hover:border-primary/60 hover:text-primary"
+                      }`}
+                    >
+                      √ LaTeX
+                    </button>
+                  </div>
                   <RichTextInput
                     value={opt.text}
                     onChange={(v) => {

@@ -72,7 +72,7 @@ export async function atualizarStatusSimulado(
           FROM samba_edvance.exam_teacher_assignments eta
           WHERE eta.exam_id = ${examId}
         `;
-        if (teachers.length > 0) {
+        if (teachers.length > 0 && prisma.notification) {
           await prisma.notification.createMany({
             data: teachers.map(t => ({
               userId:  t.user_id,
@@ -96,7 +96,7 @@ export async function atualizarStatusSimulado(
           FROM samba_edvance.exam_teacher_assignments eta
           WHERE eta.exam_id = ${examId}
         `;
-        if (teachers.length > 0) {
+        if (teachers.length > 0 && prisma.notification) {
           await prisma.notification.createMany({
             data: teachers.map(t => ({
               userId:  t.user_id,
@@ -125,6 +125,71 @@ export async function atualizarStatusSimulado(
   } catch (e) {
     console.error(e);
     return { error: "Erro ao atualizar status." };
+  }
+}
+
+// ─── Destravar simulado (volta a collecting e limpa PDFs gerados) ─────────────
+
+/**
+ * Destravar o simulado: apaga todos os PDFs gerados, limpa o campo pdf_path
+ * na tabela de exams (se existir) e retorna o status para 'collecting'.
+ * Somente ADMIN e COORDINATOR podem executar esta ação.
+ */
+export async function destravarSimulado(examId: number): Promise<ActionResult> {
+  const session = await getSession();
+  if (!session) return { error: "Não autenticado." };
+  if (session.role !== "ADMIN" && session.role !== "COORDINATOR") {
+    return { error: "Acesso restrito a coordenadores e administradores." };
+  }
+
+  try {
+    // ── 1. Apaga arquivos PDF gerados do disco ────────────────────────────────
+    // Os cadernos são salvos em public/uploads/exam-{id}/pdfs/
+    const pdfDir = path.join(process.cwd(), "public", "uploads", `exam-${examId}`, "pdfs");
+    if (fs.existsSync(pdfDir)) {
+      const files = fs.readdirSync(pdfDir);
+      for (const file of files) {
+        if (file.endsWith(".pdf")) {
+          try {
+            fs.unlinkSync(path.join(pdfDir, file));
+          } catch {
+            // ignora erros individuais — arquivo pode já ter sido removido
+          }
+        }
+      }
+      // Remove o diretório se estiver vazio
+      try { fs.rmdirSync(pdfDir); } catch { /* não vazio ou já removido */ }
+    }
+
+    // ── 2. Reseta status para 'collecting' no banco ───────────────────────────
+    await prisma.$executeRaw`
+      UPDATE samba_edvance.exams
+      SET status = 'collecting'
+      WHERE id = ${examId}
+    `;
+
+    // ── 3. Notifica o criador do simulado ─────────────────────────────────────
+    const exams = await prisma.$queryRaw<Array<{ title: string; created_by: number | null }>>`
+      SELECT title, created_by FROM samba_edvance.exams WHERE id = ${examId}
+    `;
+    const exam = exams[0];
+    if (exam?.created_by && prisma.notification) {
+      await prisma.notification.create({
+        data: {
+          userId:  exam.created_by,
+          title:   `Simulado destravado`,
+          message: `O simulado "${exam.title}" foi destravado. Os cadernos gerados foram removidos e o simulado está aberto para nova geração.`,
+          link:    `/dashboard/simulados/${examId}`,
+        },
+      });
+    }
+
+    revalidatePath(`/dashboard/simulados/${examId}`);
+    revalidatePath("/dashboard");
+    return { success: "Simulado destravado. PDFs gerados foram removidos." };
+  } catch (e) {
+    console.error("[destravarSimulado]", e);
+    return { error: "Erro ao destravar simulado." };
   }
 }
 
