@@ -13,7 +13,7 @@ import {
   salvarCota, atribuirProfessor, removerAtribuicaoProfessor,
   atualizarEstadoQuestao, atualizarGabaritoQuestao, excluirSimulado,
   getTeachersForClassDiscipline, aprovarTodasQuestoes, listarAlunosDaTurma,
-  limparTodasQuestoes,
+  limparTodasQuestoes, destravarSimulado,
 } from "@/lib/exam-actions";
 import { toast } from "sonner";
 import { RichText } from "@/components/RichText";
@@ -167,6 +167,13 @@ export function SimuladoCoordenaorPage({ simulado, classes, quotas, assignments,
     else { toast.success(res.success); startTransition(() => router.refresh()); }
   }
 
+  async function handleDestravar() {
+    if (!await askConfirm("Destravar o simulado? Os cadernos PDF gerados serão removidos e o simulado voltará a aceitar novas questões.")) return;
+    const res = await destravarSimulado(simulado.id);
+    if (res.error) toast.error(res.error);
+    else { toast.success(res.success); startTransition(() => router.refresh()); }
+  }
+
   // ── Turmas ──────────────────────────────────────────────────────────────────
   const [newClassId, setNewClassId] = useState("");
   async function handleAddClass() {
@@ -280,7 +287,7 @@ export function SimuladoCoordenaorPage({ simulado, classes, quotas, assignments,
           )}
           {simulado.status === "locked" && (
             <>
-              <button onClick={() => handleStatus("collecting")} disabled={isPending}
+              <button onClick={handleDestravar} disabled={isPending}
                 className="flex items-center gap-2 h-9 px-4 border border-border text-foreground rounded-xl font-bold text-xs hover:bg-muted/50 transition-all">
                 <Unlock size={13} /> Destravar
               </button>

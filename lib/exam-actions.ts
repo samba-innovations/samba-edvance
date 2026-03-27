@@ -67,15 +67,15 @@ export async function atualizarStatusSimulado(
       const link = `/dashboard/simulados/${examId}`;
       if (status === "collecting") {
         // Notifica professores atribuídos que podem começar a enviar questões
-        const teachers = await prisma.$queryRaw<Array<{ user_id: number }>>`
-          SELECT DISTINCT eta.user_id
+        const teachers = await prisma.$queryRaw<Array<{ teacher_id: number }>>`
+          SELECT DISTINCT eta.teacher_id
           FROM samba_edvance.exam_teacher_assignments eta
           WHERE eta.exam_id = ${examId}
         `;
         if (teachers.length > 0 && prisma.notification) {
           await prisma.notification.createMany({
             data: teachers.map(t => ({
-              userId:  t.user_id,
+              userId:  t.teacher_id,
               title:   `Simulado liberado para envio`,
               message: `O simulado "${exam.title}" está coletando questões. Envie suas contribuições.`,
               link,
@@ -91,15 +91,15 @@ export async function atualizarStatusSimulado(
         );
       } else if (status === "published") {
         // Notifica professores que o simulado foi publicado
-        const teachers = await prisma.$queryRaw<Array<{ user_id: number }>>`
-          SELECT DISTINCT eta.user_id
+        const teachers = await prisma.$queryRaw<Array<{ teacher_id: number }>>`
+          SELECT DISTINCT eta.teacher_id
           FROM samba_edvance.exam_teacher_assignments eta
           WHERE eta.exam_id = ${examId}
         `;
         if (teachers.length > 0 && prisma.notification) {
           await prisma.notification.createMany({
             data: teachers.map(t => ({
-              userId:  t.user_id,
+              userId:  t.teacher_id,
               title:   `Simulado publicado`,
               message: `O simulado "${exam.title}" foi publicado e está disponível para aplicação.`,
               link,
@@ -161,11 +161,22 @@ export async function destravarSimulado(examId: number): Promise<ActionResult> {
       try { fs.rmdirSync(pdfDir); } catch { /* não vazio ou já removido */ }
     }
 
-    // ── 2. Reseta status para 'collecting' no banco ───────────────────────────
+    // ── 2. Reseta status para 'collecting' ───────────────────────────────────
     await prisma.$executeRaw`
       UPDATE samba_edvance.exams
       SET status = 'collecting'
       WHERE id = ${examId}
+    `;
+    // Reseta progresso dos professores para 'pending' / 'partial' (remove 'done')
+    await prisma.$executeRaw`
+      UPDATE samba_edvance.exam_teacher_progress
+      SET status = CASE
+        WHEN submitted = 0 THEN 'pending'
+        WHEN submitted >= quota AND quota > 0 THEN 'complete'
+        ELSE 'partial'
+      END,
+      updated_at = NOW()
+      WHERE exam_id = ${examId} AND status = 'done'
     `;
 
     // ── 3. Notifica o criador do simulado ─────────────────────────────────────
