@@ -2,14 +2,26 @@ import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { createToken, cookieOptions, COOKIE_NAME, SessionUser } from '@/lib/auth'
 
-const ACCESS_URL = process.env.NEXT_PUBLIC_URL_ACCESS ?? 'http://localhost:3002'
+// URL interna Docker para comunicação container-a-container;
+// fallback para URL pública em dev local.
+const ACCESS_URL =
+  process.env.ACCESS_INTERNAL_URL ??
+  process.env.NEXT_PUBLIC_URL_ACCESS ??
+  'http://localhost:3002'
+
+/** Constrói redirect usando as headers forwarded (evita usar URL interna do container). */
+function publicRedirect(request: NextRequest, path: string) {
+  const proto = request.headers.get('x-forwarded-proto') ?? 'http'
+  const host  = request.headers.get('x-forwarded-host') ?? request.headers.get('host') ?? 'localhost'
+  return NextResponse.redirect(`${proto}://${host}${path}`)
+}
 
 // GET /auth/sso?token=<uuid>
 export async function GET(request: NextRequest) {
   const token = request.nextUrl.searchParams.get('token')
 
   if (!token) {
-    return NextResponse.redirect(new URL('/login', request.url))
+    return publicRedirect(request, '/login')
   }
 
   try {
@@ -20,7 +32,7 @@ export async function GET(request: NextRequest) {
     })
 
     if (!res.ok) {
-      return NextResponse.redirect(new URL('/login?error=sso', request.url))
+      return publicRedirect(request, '/login?error=sso')
     }
 
     const { user } = (await res.json()) as { user: SessionUser }
@@ -29,10 +41,8 @@ export async function GET(request: NextRequest) {
     const cookieStore = await cookies()
     cookieStore.set(COOKIE_NAME, jwt, cookieOptions())
 
-    const proto = request.headers.get('x-forwarded-proto') ?? 'https'
-    const host = request.headers.get('x-forwarded-host') ?? request.headers.get('host') ?? 'localhost'
-    return NextResponse.redirect(`${proto}://${host}/dashboard`)
+    return publicRedirect(request, '/dashboard')
   } catch {
-    return NextResponse.redirect(new URL('/login?error=sso', request.url))
+    return publicRedirect(request, '/login?error=sso')
   }
 }
