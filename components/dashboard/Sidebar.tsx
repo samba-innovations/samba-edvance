@@ -172,6 +172,14 @@ export function Sidebar({ role, profile }: SidebarProps) {
               label="Matrizes"
               active={pathname.startsWith("/dashboard/matrizes")}
             />
+            {!isAdmin && (
+              <NavLink
+                href="/dashboard/turmas"
+                icon={Users}
+                label="Turmas"
+                active={pathname.startsWith("/dashboard/turmas")}
+              />
+            )}
           </nav>
         </div>
 
