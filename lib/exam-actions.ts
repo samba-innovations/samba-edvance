@@ -441,16 +441,16 @@ export async function atualizarEstadoQuestao(
     `;
 
     // Notifica o professor autor da questão
-    const authors = await prisma.$queryRaw<Array<{ created_by: number | null; exam_title: string }>>`
-      SELECT q.created_by, e.title AS exam_title
+    const authors = await prisma.$queryRaw<Array<{ teacher_id: number | null; exam_title: string }>>`
+      SELECT q.teacher_id, e.title AS exam_title
       FROM samba_edvance.questions q
       JOIN samba_edvance.exams e ON e.id = q.exam_id
       WHERE q.id = ${questionId}
     `;
     const author = authors[0];
-    if (author?.created_by) {
+    if (author?.teacher_id) {
       await notifyUser(
-        author.created_by,
+        author.teacher_id,
         state === "approved" ? "Questão aprovada" : "Questão rejeitada",
         state === "approved"
           ? `Uma das suas questões no simulado "${author.exam_title}" foi aprovada.`
