@@ -161,10 +161,13 @@ export async function destravarSimulado(examId: number): Promise<ActionResult> {
       try { fs.rmdirSync(pdfDir); } catch { /* não vazio ou já removido */ }
     }
 
-    // ── 2. Reseta status para 'collecting' ───────────────────────────────────
+    // ── 2. Retrocede um passo (locked → review) sem regredir ao início ───────
+    // "review" = passo 1 (Coletar), professores ainda podem enviar questões.
+    // Nunca vai para 'collecting' (passo 0 "Configurar") após o simulado ter
+    // avançado além da configuração inicial.
     await prisma.$executeRaw`
       UPDATE samba_edvance.exams
-      SET status = 'collecting'
+      SET status = 'review'
       WHERE id = ${examId}
     `;
     // Reseta progresso dos professores para 'pending' / 'partial' (remove 'done')

@@ -48,7 +48,7 @@ const statusCfg: Record<string, { label:string; class:string }> = {
   archived:   { label:"Arquivado", class:"bg-muted text-muted-foreground/60" },
 };
 
-const progressCfg: Record<string, { icon:React.ElementType; class:string }> = {
+const progressCfg: Record<string, { icon:ElementType; class:string }> = {
   pending:  { icon:Clock,        class:"text-muted-foreground" },
   partial:  { icon:AlertCircle,  class:"text-secondary" },
   complete: { icon:CheckCircle2, class:"text-emerald-600 dark:text-emerald-400" },
@@ -64,7 +64,7 @@ const questionStateCfg: Record<string, { label:string; class:string }> = {
 
 type Tab = "turmas" | "cotas" | "professores" | "questoes" | "cadernos";
 
-const TABS: { id:Tab; label:string; icon:React.ElementType }[] = [
+const TABS: { id:Tab; label:string; icon:ElementType }[] = [
   { id:"turmas",     label:"Turmas",     icon:Users },
   { id:"cotas",      label:"Cotas",      icon:BarChart3 },
   { id:"professores",label:"Professores",icon:UserCheck },
@@ -97,64 +97,69 @@ function StepGuide({ status, onTabChange }: { status: string; onTabChange: (tab:
   const current = STATUS_TO_STEP[status] ?? 0;
   const activeStep = STEPS[current];
   const isDone = status === "published" || status === "archived";
+  // Percentagem de preenchimento da track: de 10% (centro col-0) a 90% (centro col-4)
+  // Cada passo avança 20% (80% / 4 gaps)
+  const fillPct = current > 0 ? (current / (STEPS.length - 1)) * 80 : 0;
 
   return (
     <div className="bg-card border border-border/60 rounded-2xl overflow-hidden">
-      {/* ── Linha de passos ─────────────────────────────────────────────────── */}
-      <div className="flex items-start px-6 pt-5 pb-4">
-        {STEPS.map((step, i) => {
-          const done   = i < current;
-          const active = i === current;
-          const StepIcon = step.icon;
-          return (
-            <div key={step.key} className="flex items-start flex-1">
-              {/* Conector esquerdo */}
-              {i > 0 && (
-                <div className={`flex-1 h-0.5 mt-[22px] mx-1 rounded-full transition-all duration-500 ${
-                  i <= current ? "bg-emerald-400" : "bg-border/50"
-                }`} />
-              )}
+      {/* ── Linha de passos (grid para espaçamento 100% simétrico) ──────────── */}
+      <div className="relative pt-5 pb-4">
+        {/* Track background: left-[10%] a right-[10%] = centros das colunas 0 e 4 */}
+        <div
+          className="absolute top-[42px] left-[10%] right-[10%] h-0.5 rounded-full bg-border/40 pointer-events-none"
+        />
+        {/* Progress fill — transição suave ao avançar */}
+        <div
+          className="absolute top-[42px] left-[10%] h-0.5 rounded-full bg-emerald-400 pointer-events-none transition-all duration-700 ease-out"
+          style={{ width: `${fillPct}%` }}
+        />
 
-              {/* Nó do passo */}
-              <div className={`flex flex-col items-center gap-2 ${i > 0 && i < STEPS.length - 1 ? "flex-1" : ""}`}
-                style={{ minWidth: 76 }}>
+        {/* Nós — grid garante espaçamento exato entre todos os passos */}
+        <div className="grid grid-cols-5">
+          {STEPS.map((step, i) => {
+            const done   = i < current;
+            const active = i === current;
+            const StepIcon = step.icon;
+            return (
+              <div key={step.key} className="flex flex-col items-center gap-2">
                 {/* Círculo */}
-                <div className={`relative w-11 h-11 rounded-full flex items-center justify-center transition-all duration-300 border-2 ${
+                <div className={`relative z-10 w-11 h-11 rounded-full flex items-center justify-center border-2 transition-all duration-300 ${
                   done
-                    ? "bg-emerald-500 border-emerald-500 text-white shadow-md shadow-emerald-500/25"
+                    ? "bg-emerald-500 border-emerald-500 text-white shadow-md shadow-emerald-500/20"
                     : active
-                    ? "bg-primary border-primary text-white shadow-lg shadow-primary/30 ring-4 ring-primary/15"
+                    ? "bg-primary border-primary text-white shadow-lg shadow-primary/25 ring-4 ring-primary/15"
                     : "bg-background border-border/50 text-muted-foreground/40"
                 }`}>
                   {done
                     ? <CheckCircle2 size={18} />
-                    : <StepIcon size={17} className={active ? "text-white" : "text-muted-foreground/40"} />
+                    : <StepIcon size={17} className={active ? "text-white" : undefined} />
                   }
-                  {/* Dot pulsante no passo ativo */}
                   {active && !isDone && (
                     <span className="absolute -top-0.5 -right-0.5 w-3 h-3 bg-primary rounded-full border-2 border-background animate-pulse" />
                   )}
                 </div>
 
-                {/* Label e descrição */}
-                <div className="text-center space-y-0.5">
-                  <p className={`text-[11px] font-black leading-tight ${
+                {/* Texto */}
+                <div className="text-center px-2">
+                  <p className={`text-[11px] font-bold leading-tight ${
                     active ? "text-foreground"
                     : done  ? "text-emerald-600 dark:text-emerald-400"
                     : "text-muted-foreground/40"
                   }`}>
                     {step.label}
                   </p>
-                  <p className={`text-[9px] leading-tight transition-all ${
+                  {/* Desc visível só no passo ativo; ocupa espaço nos demais para manter alinhamento */}
+                  <p className={`text-[9.5px] leading-snug mt-0.5 ${
                     active ? "text-muted-foreground" : "text-transparent select-none"
                   }`}>
                     {step.desc}
                   </p>
                 </div>
               </div>
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
       </div>
 
       {/* ── Barra de próximo passo ───────────────────────────────────────────── */}
@@ -162,10 +167,10 @@ function StepGuide({ status, onTabChange }: { status: string; onTabChange: (tab:
         <div className="flex items-center justify-between gap-4 px-6 py-3 border-t border-border/40 bg-primary/[0.04]">
           <div className="flex items-center gap-2.5 min-w-0">
             <span className="w-2 h-2 rounded-full bg-primary animate-pulse shrink-0" />
-            <span className="text-[13px] text-foreground truncate">
-              <span className="text-muted-foreground font-normal">Próximo: </span>
-              <span className="font-semibold">{activeStep.action}</span>
-            </span>
+            <p className="text-[13px] truncate">
+              <span className="text-muted-foreground">Próximo: </span>
+              <span className="font-semibold text-foreground">{activeStep.action}</span>
+            </p>
           </div>
           {activeStep.tabs.length > 0 && (
             <button
@@ -341,7 +346,7 @@ export function SimuladoCoordenaorPage({ simulado, classes, quotas, assignments,
         </div>
         {/* Status actions */}
         <div className="flex items-center gap-2 shrink-0">
-          {simulado.status === "collecting" && (
+          {(simulado.status === "collecting" || simulado.status === "review") && (
             <button onClick={() => handleStatus("locked")} disabled={isPending}
               className="flex items-center gap-2 h-9 px-4 bg-primary text-white rounded-xl font-bold text-xs hover:bg-primary/90 transition-all active:scale-95 disabled:opacity-60">
               <Lock size={13} /> Travar
