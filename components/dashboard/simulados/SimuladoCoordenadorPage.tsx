@@ -206,6 +206,7 @@ export function SimuladoCoordenaorPage({ simulado, classes, quotas, assignments,
   const [isPending, startTransition] = useTransition();
   const cfg = statusCfg[simulado.status] ?? { label: simulado.status, class:"bg-muted text-muted-foreground" };
   const isLocked = ["locked","generated","published","archived"].includes(simulado.status);
+  const todasAprovadas = questions.length > 0 && questions.every(q => q.state === "approved");
 
   // Alunos por turma (carregados ao expandir)
   type StudentRow = { id: number; ra: string; name: string; class_name: string };
@@ -354,20 +355,26 @@ export function SimuladoCoordenaorPage({ simulado, classes, quotas, assignments,
           )}
           {simulado.status === "locked" && (
             <>
-              <button onClick={handleDestravar} disabled={isPending}
-                className="flex items-center gap-2 h-9 px-4 border border-border text-foreground rounded-xl font-bold text-xs hover:bg-muted/50 transition-all">
+              <button
+                onClick={handleDestravar}
+                disabled={isPending || !todasAprovadas}
+                title={!todasAprovadas ? "Aprove todas as questões antes de destravar" : undefined}
+                className="flex items-center gap-2 h-9 px-4 border border-border text-foreground rounded-xl font-bold text-xs hover:bg-muted/50 transition-all disabled:opacity-40 disabled:cursor-not-allowed">
                 <Unlock size={13} /> Destravar
               </button>
-              <button onClick={async () => { await handleStatus("generated"); setTab("cadernos"); }} disabled={isPending}
-                className="flex items-center gap-2 h-9 px-4 bg-teal-600 text-white rounded-xl font-bold text-xs hover:bg-teal-700 transition-all active:scale-95 disabled:opacity-60">
+              <button onClick={async () => { await handleStatus("generated"); setTab("cadernos"); }} disabled={isPending || !todasAprovadas}
+                className="flex items-center gap-2 h-9 px-4 bg-teal-600 text-white rounded-xl font-bold text-xs hover:bg-teal-700 transition-all active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed">
                 {isPending ? <Loader2 size={13} className="animate-spin" /> : <FileText size={13} />} Gerar PDF
               </button>
             </>
           )}
           {simulado.status === "generated" && (
             <>
-              <button onClick={handleDestravar} disabled={isPending}
-                className="flex items-center gap-2 h-9 px-4 border border-border text-foreground rounded-xl font-bold text-xs hover:bg-muted/50 transition-all">
+              <button
+                onClick={handleDestravar}
+                disabled={isPending || !todasAprovadas}
+                title={!todasAprovadas ? "Aprove todas as questões antes de destravar" : undefined}
+                className="flex items-center gap-2 h-9 px-4 border border-border text-foreground rounded-xl font-bold text-xs hover:bg-muted/50 transition-all disabled:opacity-40 disabled:cursor-not-allowed">
                 <Unlock size={13} /> Destravar
               </button>
               <button onClick={() => setTab("cadernos")}
@@ -382,8 +389,11 @@ export function SimuladoCoordenaorPage({ simulado, classes, quotas, assignments,
           )}
           {simulado.status === "published" && (
             <>
-              <button onClick={handleDestravar} disabled={isPending}
-                className="flex items-center gap-2 h-9 px-4 border border-border text-foreground rounded-xl font-bold text-xs hover:bg-muted/50 transition-all">
+              <button
+                onClick={handleDestravar}
+                disabled={isPending || !todasAprovadas}
+                title={!todasAprovadas ? "Aprove todas as questões antes de destravar" : undefined}
+                className="flex items-center gap-2 h-9 px-4 border border-border text-foreground rounded-xl font-bold text-xs hover:bg-muted/50 transition-all disabled:opacity-40 disabled:cursor-not-allowed">
                 <Unlock size={13} /> Destravar
               </button>
               <button onClick={() => setTab("cadernos")}
