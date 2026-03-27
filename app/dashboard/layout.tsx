@@ -3,6 +3,9 @@ import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 
+// Todas as rotas do dashboard são dinâmicas (autenticação + queries em runtime)
+export const dynamic = "force-dynamic";
+
 export default async function DashboardLayout({
   children,
 }: {
