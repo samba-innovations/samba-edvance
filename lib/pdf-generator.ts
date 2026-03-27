@@ -10,31 +10,51 @@ import path from "path";
 import fs from "fs";
 import { MathSegment, renderMathSegments } from "./math-render";
 
-// ─── Constantes (idênticas ao Python) ─────────────────────────────────────────
+// ─── Constantes de layout ─────────────────────────────────────────────────────
 
 const PAGE_W  = 595.28;
 const PAGE_H  = 841.89;
 const CM      = 28.3465;
 
-const ML      = 1.5  * CM;   // MARGIN_INTERIOR (esquerda)
-const MR      = 1.0  * CM;   // MARGIN_EXTERIOR (direita)
-const MT      = 1.5  * CM;   // MARGIN_TOP
-const MB      = 1.2  * CM;   // MARGIN_BOTTOM
-const COL_GAP = 0.4  * CM;
-const COL_W   = (PAGE_W - ML - MR - COL_GAP) / 2;  // ~256 pt
-const FOOTER_H = 1.0 * CM;
+const ML      = 1.2  * CM;   // margem esquerda
+const MR      = 0.8  * CM;   // margem direita
+const MT      = 1.2  * CM;   // margem superior
+const MB      = 1.0  * CM;   // margem inferior
+const COL_GAP = 0.35 * CM;   // gap entre colunas
+const COL_W   = (PAGE_W - ML - MR - COL_GAP) / 2;  // ~263 pt (antes ~256)
+const FOOTER_H = 0.8 * CM;
 const HEADER_H = 4.0 * CM;
 
-// Área útil das colunas (PDFKit y, de cima)
-const COL_BOT = PAGE_H - MB - FOOTER_H;  // fim das colunas
-const COL_TOP_FIRST = MT + HEADER_H;      // início na 1ª página de questões
-const COL_TOP_OTHER = MT;                 // início nas demais
+// Área útil das colunas
+const COL_BOT       = PAGE_H - MB - FOOTER_H;
+const COL_TOP_FIRST = MT + HEADER_H;
+const COL_TOP_OTHER = MT;
 
-const F_NORM  = "Helvetica";
-const F_BOLD  = "Helvetica-Bold";
-const F_OBLI  = "Helvetica-Oblique";
+// Posições do footer derivadas das constantes (evita hardcode)
+const FOOTER_LINE_Y = PAGE_H - MB - FOOTER_H + 0.12 * CM;
+const FOOTER_TEXT_Y = PAGE_H - MB - FOOTER_H + FOOTER_H * 0.35;
+
+// ─── Fontes ───────────────────────────────────────────────────────────────────
+// Para usar fonte customizada, coloque os arquivos TTF em public/assets/fonts/:
+//   SourceSans3-Regular.ttf  SourceSans3-Bold.ttf  SourceSans3-Italic.ttf
+// Download gratuito: https://fonts.google.com/specimen/Source+Sans+3
+// Sem os arquivos, o sistema usa Helvetica (incorporada no PDFKit).
+
+const FONTS_DIR = path.join(process.cwd(), "public", "assets", "fonts");
+function _fontPath(file: string): string | null {
+  const p = path.join(FONTS_DIR, file);
+  return fs.existsSync(p) ? p : null;
+}
+const _customNorm = _fontPath("SourceSans3-Regular.ttf");
+const _customBold = _fontPath("SourceSans3-Bold.ttf");
+const _customObli = _fontPath("SourceSans3-Italic.ttf");
+const HAS_CUSTOM_FONT = !!(_customNorm && _customBold && _customObli);
+
+const F_NORM  = HAS_CUSTOM_FONT ? "SS3-Regular" : "Helvetica";
+const F_BOLD  = HAS_CUSTOM_FONT ? "SS3-Bold"    : "Helvetica-Bold";
+const F_OBLI  = HAS_CUSTOM_FONT ? "SS3-Italic"  : "Helvetica-Oblique";
 const F_SIZE  = 10;
-const LEADING = 12;
+const LEADING = 11;   // espaçamento simples (~1.1× @ 10pt)
 
 // ─── Conversão de coordenada ReportLab → PDFKit ───────────────────────────────
 // rl(y) converte y medido da BASE para y medido do TOPO
@@ -263,13 +283,11 @@ function drawInstitutionalHeader(doc: Doc) {
 
 /** Footer com número de página */
 function drawFooter(doc: Doc, pageNum: number) {
-  // RL: fy = MARGIN_BOTTOM − 0.3cm = 0.9cm da base → y_pdf = PAGE_H − 0.9cm
-  // Linha: fy + 0.5cm = 1.4cm da base → y_pdf = PAGE_H − 1.4cm
-  hline(doc, ML, PAGE_W - MR, PAGE_H - 1.4 * CM, 0.4);
+  hline(doc, ML, PAGE_W - MR, FOOTER_LINE_Y, 0.4);
   const s = String(pageNum);
-  const sw = strW(doc, s, { font: F_NORM, size: 10 });
-  doc.save().font(F_NORM).fontSize(10).fillColor("#000")
-    .text(s, PAGE_W / 2 - sw / 2, PAGE_H - 0.9 * CM, { lineBreak: false })
+  const sw = strW(doc, s, { font: F_NORM, size: 9 });
+  doc.save().font(F_NORM).fontSize(9).fillColor("#000")
+    .text(s, PAGE_W / 2 - sw / 2, FOOTER_TEXT_Y, { lineBreak: false })
     .restore();
 }
 
@@ -386,18 +404,67 @@ function resolveImg(src: string): string | null {
   return fs.existsSync(p) ? p : null;
 }
 
+/** Registra fontes customizadas no documento (no-op se não houver arquivos) */
+function registerFonts(doc: Doc) {
+  if (HAS_CUSTOM_FONT) {
+    _doc(doc).registerFont("SS3-Regular", _customNorm);
+    _doc(doc).registerFont("SS3-Bold",    _customBold);
+    _doc(doc).registerFont("SS3-Italic",  _customObli);
+  }
+}
+
+/**
+ * Desenha uma linha de texto com justificação por word-spacing.
+ * Linhas finais de parágrafo (isParaEnd=true) ficam alinhadas à esquerda.
+ */
+function drawJustifiedLine(
+  doc: Doc, line: string, x: number, y: number, lineWidth: number, isParaEnd: boolean
+) {
+  if (isParaEnd || !line.includes(" ")) {
+    doc.save().font(F_NORM).fontSize(F_SIZE).fillColor("#000")
+      .text(line, x, y, { lineBreak: false });
+    doc.restore();
+    return;
+  }
+  const words = line.split(" ").filter(w => w.length > 0);
+  if (words.length <= 1) {
+    doc.save().font(F_NORM).fontSize(F_SIZE).fillColor("#000")
+      .text(line, x, y, { lineBreak: false });
+    doc.restore();
+    return;
+  }
+  const totalW = words.reduce((s, w) => s + strW(doc, w, { font: F_NORM, fontSize: F_SIZE }), 0);
+  const gap = (lineWidth - totalW) / (words.length - 1);
+  // Não justifica se o gap for muito grande (linha muito curta)
+  if (gap > 18) {
+    doc.save().font(F_NORM).fontSize(F_SIZE).fillColor("#000")
+      .text(line, x, y, { lineBreak: false });
+    doc.restore();
+    return;
+  }
+  let cx = x;
+  for (const word of words) {
+    const ww = strW(doc, word, { font: F_NORM, fontSize: F_SIZE });
+    doc.save().font(F_NORM).fontSize(F_SIZE).fillColor("#000")
+      .text(word, cx, y, { lineBreak: false });
+    doc.restore();
+    cx += ww + gap;
+  }
+}
+
 /**
  * Word-wrap `text` into lines, respecting `maxWidth`.
- * The first line has `firstLineAvail` available (may be < maxWidth when curX > x).
- * Returns an array of line strings.
+ * Returns `{ text, isParaEnd }` — isParaEnd marks the last line of each paragraph.
  */
+type LineEntry = { text: string; isParaEnd: boolean };
+
 function splitIntoLines(
   doc: Doc,
   text: string,
   maxWidth: number,
   firstLineAvail = maxWidth,
-): string[] {
-  const lines: string[] = [];
+): LineEntry[] {
+  const lines: LineEntry[] = [];
   const paras = text.split("\n");
   let isFirst = true;
   for (const para of paras) {
@@ -410,16 +477,16 @@ function splitIntoLines(
       if (strW(doc, candidate, { font: F_NORM, fontSize: F_SIZE }) <= lineAvail) {
         cur = candidate;
       } else if (cur) {
-        lines.push(cur);
+        lines.push({ text: cur, isParaEnd: false });
         cur = word;
-        lineAvail = maxWidth;  // subsequent lines use full width
+        lineAvail = maxWidth;
       } else {
-        lines.push(word);
+        lines.push({ text: word, isParaEnd: false });
         cur = "";
         lineAvail = maxWidth;
       }
     }
-    lines.push(cur);
+    lines.push({ text: cur, isParaEnd: true }); // última linha do parágrafo
     isFirst = false;
   }
   return lines;
@@ -448,13 +515,11 @@ function segmentsHeight(doc: Doc, segs: MathSegment[], width: number): number {
       if (!safe.trim()) continue;
       const avail = width - curX;
       const lines = splitIntoLines(doc, safe, width, avail);
-      // All lines except the last end their row
       for (let li = 0; li < lines.length - 1; li++) {
         rowH = Math.max(rowH, LEADING);
         newRow();
       }
-      // Last line stays on the current row (inline)
-      const lastLineW = strW(doc, lines[lines.length - 1], { font: F_NORM, fontSize: F_SIZE });
+      const lastLineW = strW(doc, lines[lines.length - 1].text, { font: F_NORM, fontSize: F_SIZE });
       curX = (lines.length > 1 ? 0 : curX) + lastLineW;
       rowH = Math.max(rowH, LEADING);
     }
@@ -475,19 +540,19 @@ function questionBlockHeight(doc: Doc, rq: RenderedQuestion): number {
   for (const src of rq.images ?? []) {
     if (resolveImg(src)) h += MAX_STEM_IMG_H + 0.15 * CM;
   }
-  h += segmentsHeight(doc, rq.stemSegments, COL_W) + 0.15 * CM;
+  h += segmentsHeight(doc, rq.stemSegments, COL_W) + 0.08 * CM;
   for (const opt of rq.optionSegments) {
     const lw = strW(doc, `${opt.label}) `, { font: F_NORM, size: F_SIZE });
-    h += segmentsHeight(doc, opt.segments, COL_W - lw) + 2;
+    h += segmentsHeight(doc, opt.segments, COL_W - lw) + 1;
     const optImgs = (opt.images ?? []).filter(src => resolveImg(src));
     if (optImgs.length > 0) {
-      h += 0.2 * CM; // espaço texto→imagem
+      h += 0.15 * CM;
       for (const src of optImgs) {
-        if (resolveImg(src)) h += MAX_OPT_IMG_H + 0.25 * CM;
+        if (resolveImg(src)) h += MAX_OPT_IMG_H + 0.20 * CM;
       }
     }
   }
-  h += 0.4 * CM;
+  h += 0.25 * CM;
   return h;
 }
 
@@ -521,20 +586,17 @@ function drawSegments(doc: Doc, segs: MathSegment[], x: number, startY: number, 
       const avail = x + width - curX;
       const lines = splitIntoLines(doc, safe, width, avail);
       for (let li = 0; li < lines.length; li++) {
-        const line = lines[li];
+        const { text: line, isParaEnd } = lines[li];
         const isLast = li === lines.length - 1;
         const lx = li === 0 ? curX : x;
+        const lineW = li === 0 ? (x + width - curX) : width;
         if (line) {
-          doc.save().font(F_NORM).fontSize(F_SIZE).fillColor("#000")
-            .text(line, lx, y, { lineBreak: false });
-          doc.restore();
+          drawJustifiedLine(doc, line, lx, y, lineW, isParaEnd);
         }
         if (!isLast) {
-          // End this row and advance to the next line
           rowH = Math.max(rowH, LEADING);
           newRow();
         } else {
-          // Last line stays inline — advance curX
           curX = lx + strW(doc, line, { font: F_NORM, fontSize: F_SIZE });
           rowH = Math.max(rowH, LEADING);
         }
@@ -573,7 +635,7 @@ function drawQuestion(doc: Doc, rq: RenderedQuestion, x: number, startY: number)
 
   // Enunciado (text + math images)
   y = drawSegments(doc, rq.stemSegments, x, y, COL_W);
-  y += 0.15 * CM;
+  y += 0.08 * CM;
 
   // Alternativas
   for (const opt of rq.optionSegments) {
@@ -588,25 +650,24 @@ function drawQuestion(doc: Doc, rq: RenderedQuestion, x: number, startY: number)
     // Imagens da alternativa — centralizadas na largura total da coluna, abaixo do texto
     const optImgs = (opt.images ?? []).filter(src => resolveImg(src));
     if (optImgs.length > 0) {
-      y += 0.2 * CM; // espaço entre texto e imagem
+      y += 0.15 * CM;
       for (const src of optImgs) {
         const imgPath = resolveImg(src)!;
         try {
           const dim = _doc(doc).openImage(imgPath);
           const scale = Math.min(MAX_OPT_IMG_W / dim.width, MAX_OPT_IMG_H / dim.height, 1);
           const iw = dim.width * scale, ih = dim.height * scale;
-          // Centraliza na largura total da coluna (não apenas na área do texto)
           const imgX = x + (COL_W - iw) / 2;
           doc.image(imgPath, imgX, y, { width: iw, height: ih });
-          y += ih + 0.25 * CM;
+          y += ih + 0.20 * CM;
         } catch { /* ignora imagem corrompida */ }
       }
     }
-    if (y === optStartY) y += F_SIZE + 2; // empty option fallback
-    y += 2;
+    if (y === optStartY) y += F_SIZE + 2;
+    y += 1;
   }
 
-  y += 0.4 * CM;
+  y += 0.25 * CM;
   return y;
 }
 
@@ -704,6 +765,7 @@ export async function buildBooklet(
 
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({ size: "A4", autoFirstPage: false, bufferPages: true });
+    registerFonts(doc);
     const chunks: Buffer[] = [];
     doc.on("data", c => chunks.push(c));
     doc.on("end", () => resolve(Buffer.concat(chunks)));
