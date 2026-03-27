@@ -6,7 +6,6 @@ function buildUrl() {
   const url = new URL(process.env.DATABASE_URL!)
   url.searchParams.set('connection_limit', '3')
   url.searchParams.set('pool_timeout', '15')
-  url.searchParams.set('connect_timeout', '10')
   return url.toString()
 }
 
