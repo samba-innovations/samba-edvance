@@ -161,25 +161,19 @@ export async function destravarSimulado(examId: number): Promise<ActionResult> {
       try { fs.rmdirSync(pdfDir); } catch { /* não vazio ou já removido */ }
     }
 
-    // ── 2. Retrocede um passo (locked → review) sem regredir ao início ───────
-    // "review" = passo 1 (Coletar), professores ainda podem enviar questões.
-    // Nunca vai para 'collecting' (passo 0 "Configurar") após o simulado ter
-    // avançado além da configuração inicial.
+    // ── 2. Volta ao passo "Revisar" (locked) para re-revisão das questões ────
+    // Mantém status = 'locked' (passo 2 "Revisar") — o coordenador re-aprova
+    // as questões sem que os professores precisem re-submeter.
     await prisma.$executeRaw`
       UPDATE samba_edvance.exams
-      SET status = 'review'
+      SET status = 'locked'
       WHERE id = ${examId}
     `;
-    // Reseta progresso dos professores para 'pending' / 'partial' (remove 'done')
+    // Questões aprovadas voltam a 'submitted' para re-avaliação
     await prisma.$executeRaw`
-      UPDATE samba_edvance.exam_teacher_progress
-      SET status = CASE
-        WHEN submitted = 0 THEN 'pending'
-        WHEN submitted >= quota AND quota > 0 THEN 'complete'
-        ELSE 'partial'
-      END,
-      updated_at = NOW()
-      WHERE exam_id = ${examId} AND status = 'done'
+      UPDATE samba_edvance.questions
+      SET state = 'submitted'
+      WHERE exam_id = ${examId} AND state = 'approved'
     `;
 
     // ── 3. Notifica o criador do simulado ─────────────────────────────────────

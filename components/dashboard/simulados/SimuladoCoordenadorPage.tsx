@@ -235,7 +235,7 @@ export function SimuladoCoordenaorPage({ simulado, classes, quotas, assignments,
   }
 
   async function handleDestravar() {
-    if (!await askConfirm("Destravar o simulado? Os cadernos PDF gerados serão removidos e o simulado voltará a aceitar novas questões.")) return;
+    if (!await askConfirm("Destravar o simulado? Os PDFs gerados serão removidos e as questões aprovadas voltarão ao estado 'enviada' para re-revisão.")) return;
     const res = await destravarSimulado(simulado.id);
     if (res.error) toast.error(res.error);
     else { toast.success(res.success); startTransition(() => router.refresh()); }
@@ -366,9 +366,9 @@ export function SimuladoCoordenaorPage({ simulado, classes, quotas, assignments,
           )}
           {simulado.status === "generated" && (
             <>
-              <button onClick={async () => { await handleStatus("locked"); }} disabled={isPending}
-                className="flex items-center gap-2 h-9 px-4 border border-border text-muted-foreground rounded-xl font-bold text-xs hover:bg-muted/50 transition-all active:scale-95 disabled:opacity-60">
-                {isPending ? <Loader2 size={13} className="animate-spin" /> : <FileText size={13} />} Regerar PDFs
+              <button onClick={handleDestravar} disabled={isPending}
+                className="flex items-center gap-2 h-9 px-4 border border-border text-foreground rounded-xl font-bold text-xs hover:bg-muted/50 transition-all">
+                <Unlock size={13} /> Destravar
               </button>
               <button onClick={() => setTab("cadernos")}
                 className="flex items-center gap-2 h-9 px-4 border border-teal-500 text-teal-600 dark:text-teal-400 rounded-xl font-bold text-xs hover:bg-teal-500/10 transition-all">
@@ -381,10 +381,16 @@ export function SimuladoCoordenaorPage({ simulado, classes, quotas, assignments,
             </>
           )}
           {simulado.status === "published" && (
-            <button onClick={() => setTab("cadernos")}
-              className="flex items-center gap-2 h-9 px-4 border border-teal-500 text-teal-600 dark:text-teal-400 rounded-xl font-bold text-xs hover:bg-teal-500/10 transition-all">
-              <Download size={13} /> Baixar Cadernos
-            </button>
+            <>
+              <button onClick={handleDestravar} disabled={isPending}
+                className="flex items-center gap-2 h-9 px-4 border border-border text-foreground rounded-xl font-bold text-xs hover:bg-muted/50 transition-all">
+                <Unlock size={13} /> Destravar
+              </button>
+              <button onClick={() => setTab("cadernos")}
+                className="flex items-center gap-2 h-9 px-4 border border-teal-500 text-teal-600 dark:text-teal-400 rounded-xl font-bold text-xs hover:bg-teal-500/10 transition-all">
+                <Download size={13} /> Baixar Cadernos
+              </button>
+            </>
           )}
         </div>
       </div>
