@@ -1,12 +1,12 @@
 "use client";
 
-import { useState, useTransition, useEffect, useCallback } from "react";
+import { useState, useTransition, useEffect, useCallback, type ElementType } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft, Lock, Unlock, Users, BookOpen, UserCheck,
   FileText, CheckCircle2, XCircle, Clock, AlertCircle,
-  ChevronDown, Trash2, Plus, Save, BarChart3, Download, Loader2
+  ChevronDown, ChevronRight, Trash2, Plus, Save, BarChart3, Download, Loader2
 } from "lucide-react";
 import {
   atualizarStatusSimulado, atribuirTurma, removerTurma,
@@ -74,58 +74,120 @@ const TABS: { id:Tab; label:string; icon:React.ElementType }[] = [
 
 // ─── Step Guide ──────────────────────────────────────────────────────────────
 
-const STEPS = [
-  { key: "collecting", label: "Configurar",    desc: "Turmas, cotas e professores" },
-  { key: "review",     label: "Coletar",       desc: "Professores enviam questões" },
-  { key: "locked",     label: "Revisar",       desc: "Aprovar e definir gabaritos" },
-  { key: "generated",  label: "Gerar PDFs",    desc: "Cadernos e folhas de resposta" },
-  { key: "published",  label: "Publicar",      desc: "Disponibilizar para aplicação" },
+const STEPS: {
+  key: string;
+  label: string;
+  desc: string;
+  action: string;
+  icon: ElementType;
+  tabs: Tab[];
+}[] = [
+  { key: "collecting", label: "Configurar",  desc: "Turmas, cotas e professores",   action: "Configure as turmas, cotas e atribua professores",  icon: Users,        tabs: ["turmas","cotas","professores"] },
+  { key: "review",     label: "Coletar",     desc: "Professores enviam questões",    action: "Acompanhe o envio das questões pelos professores",   icon: BookOpen,     tabs: ["questoes"] },
+  { key: "locked",     label: "Revisar",     desc: "Aprovar e definir gabaritos",    action: "Revise, aprove questões e defina os gabaritos",      icon: UserCheck,    tabs: ["questoes"] },
+  { key: "generated",  label: "Gerar PDFs",  desc: "Cadernos e folhas de resposta",  action: "Baixe e confira os cadernos gerados",               icon: FileText,     tabs: ["cadernos"] },
+  { key: "published",  label: "Publicar",    desc: "Disponível para aplicação",      action: "Simulado publicado e disponível",                    icon: CheckCircle2, tabs: ["cadernos"] },
 ];
 
 const STATUS_TO_STEP: Record<string, number> = {
   draft: 0, collecting: 0, review: 1, locked: 2, generated: 3, published: 4, archived: 4,
 };
 
-function StepGuide({ status }: { status: string }) {
+function StepGuide({ status, onTabChange }: { status: string; onTabChange: (tab: Tab) => void }) {
   const current = STATUS_TO_STEP[status] ?? 0;
+  const activeStep = STEPS[current];
+  const isDone = status === "published" || status === "archived";
+
   return (
-    <div className="flex items-center gap-0 overflow-x-auto pb-1">
-      {STEPS.map((step, i) => {
-        const done    = i < current;
-        const active  = i === current;
-        const future  = i > current;
-        return (
-          <div key={step.key} className="flex items-center shrink-0">
-            <div className="flex flex-col items-center gap-1 min-w-[88px]">
-              {/* Bolinha */}
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-black transition-all ${
-                done   ? "bg-emerald-500 text-white shadow-sm shadow-emerald-500/30"
-                : active ? "bg-primary text-white shadow-sm shadow-primary/30 ring-4 ring-primary/20"
-                : "bg-muted text-muted-foreground/50"
-              }`}>
-                {done ? <CheckCircle2 size={15} /> : <span>{i + 1}</span>}
-              </div>
-              {/* Label */}
-              <span className={`text-[10px] font-black leading-tight text-center ${
-                active ? "text-primary" : done ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground/50"
-              }`}>
-                {step.label}
-              </span>
-              {active && (
-                <span className="text-[9px] text-muted-foreground/70 text-center leading-tight max-w-[80px]">
-                  {step.desc}
-                </span>
+    <div className="bg-card border border-border/60 rounded-2xl overflow-hidden">
+      {/* ── Linha de passos ─────────────────────────────────────────────────── */}
+      <div className="flex items-start px-6 pt-5 pb-4">
+        {STEPS.map((step, i) => {
+          const done   = i < current;
+          const active = i === current;
+          const StepIcon = step.icon;
+          return (
+            <div key={step.key} className="flex items-start flex-1">
+              {/* Conector esquerdo */}
+              {i > 0 && (
+                <div className={`flex-1 h-0.5 mt-[22px] mx-1 rounded-full transition-all duration-500 ${
+                  i <= current ? "bg-emerald-400" : "bg-border/50"
+                }`} />
               )}
+
+              {/* Nó do passo */}
+              <div className={`flex flex-col items-center gap-2 ${i > 0 && i < STEPS.length - 1 ? "flex-1" : ""}`}
+                style={{ minWidth: 76 }}>
+                {/* Círculo */}
+                <div className={`relative w-11 h-11 rounded-full flex items-center justify-center transition-all duration-300 border-2 ${
+                  done
+                    ? "bg-emerald-500 border-emerald-500 text-white shadow-md shadow-emerald-500/25"
+                    : active
+                    ? "bg-primary border-primary text-white shadow-lg shadow-primary/30 ring-4 ring-primary/15"
+                    : "bg-background border-border/50 text-muted-foreground/40"
+                }`}>
+                  {done
+                    ? <CheckCircle2 size={18} />
+                    : <StepIcon size={17} className={active ? "text-white" : "text-muted-foreground/40"} />
+                  }
+                  {/* Dot pulsante no passo ativo */}
+                  {active && !isDone && (
+                    <span className="absolute -top-0.5 -right-0.5 w-3 h-3 bg-primary rounded-full border-2 border-background animate-pulse" />
+                  )}
+                </div>
+
+                {/* Label e descrição */}
+                <div className="text-center space-y-0.5">
+                  <p className={`text-[11px] font-black leading-tight ${
+                    active ? "text-foreground"
+                    : done  ? "text-emerald-600 dark:text-emerald-400"
+                    : "text-muted-foreground/40"
+                  }`}>
+                    {step.label}
+                  </p>
+                  <p className={`text-[9px] leading-tight transition-all ${
+                    active ? "text-muted-foreground" : "text-transparent select-none"
+                  }`}>
+                    {step.desc}
+                  </p>
+                </div>
+              </div>
             </div>
-            {/* Linha conectora */}
-            {i < STEPS.length - 1 && (
-              <div className={`w-8 h-0.5 mb-5 transition-all ${
-                i < current ? "bg-emerald-400" : "bg-muted"
-              }`} />
-            )}
+          );
+        })}
+      </div>
+
+      {/* ── Barra de próximo passo ───────────────────────────────────────────── */}
+      {!isDone && activeStep && (
+        <div className="flex items-center justify-between gap-4 px-6 py-3 border-t border-border/40 bg-primary/[0.04]">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <span className="w-2 h-2 rounded-full bg-primary animate-pulse shrink-0" />
+            <span className="text-[13px] text-foreground truncate">
+              <span className="text-muted-foreground font-normal">Próximo: </span>
+              <span className="font-semibold">{activeStep.action}</span>
+            </span>
           </div>
-        );
-      })}
+          {activeStep.tabs.length > 0 && (
+            <button
+              onClick={() => onTabChange(activeStep.tabs[0])}
+              className="flex items-center gap-1.5 text-xs font-bold text-primary bg-primary/10 hover:bg-primary/20 active:scale-95 px-3.5 py-2 rounded-xl transition-all shrink-0"
+            >
+              {TABS.find(t => t.id === activeStep.tabs[0])?.label}
+              <ChevronRight size={13} />
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* ── Publicado ────────────────────────────────────────────────────────── */}
+      {isDone && (
+        <div className="flex items-center gap-2.5 px-6 py-3 border-t border-emerald-500/20 bg-emerald-500/5">
+          <CheckCircle2 size={15} className="text-emerald-600 dark:text-emerald-400 shrink-0" />
+          <span className="text-sm font-semibold text-emerald-700 dark:text-emerald-400">
+            Simulado publicado e disponível para aplicação.
+          </span>
+        </div>
+      )}
     </div>
   );
 }
@@ -323,22 +385,34 @@ export function SimuladoCoordenaorPage({ simulado, classes, quotas, assignments,
       </div>
 
       {/* ── Step Guide ─────────────────────────────────────────────────────── */}
-      <StepGuide status={simulado.status} />
+      <StepGuide status={simulado.status} onTabChange={setTab} />
 
       {/* Tabs */}
-      <div className="flex gap-1 bg-muted/40 p-1 rounded-2xl w-fit">
-        {TABS.map((t) => (
-          <button key={t.id} onClick={() => setTab(t.id)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
-              tab === t.id ? "bg-card shadow-sm text-primary" : "text-muted-foreground hover:text-foreground"
-            }`}>
-            <t.icon size={14} /> {t.label}
-            {t.id === "questoes" && questions.length > 0 && (
-              <span className="bg-primary/15 text-primary text-[10px] font-black px-1.5 py-0.5 rounded-full">{questions.length}</span>
-            )}
-          </button>
-        ))}
-      </div>
+      {(() => {
+        const nextTabs = STEPS[STATUS_TO_STEP[simulado.status] ?? 0]?.tabs ?? [];
+        return (
+          <div className="flex gap-1 bg-muted/40 p-1 rounded-2xl w-fit">
+            {TABS.map((t) => {
+              const isNext = nextTabs.includes(t.id) && tab !== t.id;
+              return (
+                <button key={t.id} onClick={() => setTab(t.id)}
+                  className={`relative flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+                    tab === t.id ? "bg-card shadow-sm text-primary" : "text-muted-foreground hover:text-foreground"
+                  }`}>
+                  <t.icon size={14} /> {t.label}
+                  {t.id === "questoes" && questions.length > 0 && (
+                    <span className="bg-primary/15 text-primary text-[10px] font-black px-1.5 py-0.5 rounded-full">{questions.length}</span>
+                  )}
+                  {/* Dot: aba recomendada para o passo atual */}
+                  {isNext && (
+                    <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-primary animate-pulse" />
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        );
+      })()}
 
       {/* ── ABA: TURMAS ────────────────────────────────────────────────────── */}
       {tab === "turmas" && (
