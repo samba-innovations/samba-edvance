@@ -78,6 +78,7 @@ model SsoToken {
 model Discipline {
   id                     Int                    @id @default(autoincrement())
   name                   String                 @db.VarChar(100)
+  disciplineType         String                 @default("base_comum") @map("discipline_type") @db.VarChar(30)
   items                  Item[]
   teacherAssignments     TeacherClassSubject[]
   examTeacherAssignments ExamTeacherAssignment[]
