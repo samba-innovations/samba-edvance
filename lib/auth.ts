@@ -3,8 +3,11 @@ import { cookies } from 'next/headers'
 
 export const COOKIE_NAME = 'samba_token'
 
-const getSecret = () =>
-  new TextEncoder().encode(process.env.JWT_SECRET ?? 'fallback-dev-secret-change-in-prod')
+const getSecret = () => {
+  const secret = process.env.JWT_SECRET
+  if (!secret) throw new Error('JWT_SECRET environment variable is required')
+  return new TextEncoder().encode(secret)
+}
 
 // ─── Tipos ───────────────────────────────────────────────────────────────────
 
