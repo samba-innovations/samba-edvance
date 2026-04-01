@@ -5,7 +5,9 @@ export const COOKIE_NAME = 'samba_token'
 
 const getSecret = () => {
   const secret = process.env.JWT_SECRET
-  if (!secret) throw new Error('JWT_SECRET environment variable is required')
+  if (!secret || secret.length < 32) {
+    throw new Error('JWT_SECRET env var ausente ou muito curto (mínimo 32 caracteres)')
+  }
   return new TextEncoder().encode(secret)
 }
 

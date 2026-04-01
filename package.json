@@ -10,10 +10,6 @@
   },
   "dependencies": {
     "@prisma/client": "^6.19.2",
-    "@types/bcryptjs": "^2.4.6",
-    "@types/jszip": "^3.4.0",
-    "@types/katex": "^0.16.8",
-    "@types/pdfkit": "^0.17.5",
     "bcryptjs": "^2.4.3",
     "clsx": "^2.1.1",
     "framer-motion": "^12.38.0",
@@ -34,7 +30,11 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@types/bcryptjs": "^2.4.6",
+    "@types/jszip": "^3.4.0",
+    "@types/katex": "^0.16.8",
     "@types/node": "^20",
+    "@types/pdfkit": "^0.17.5",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
