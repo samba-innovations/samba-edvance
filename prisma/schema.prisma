@@ -113,11 +113,11 @@ model ClassSection {
 
 model SchoolClass {
   id                     Int                    @id @default(autoincrement())
-  gradeId                Int?                   @map("grade_id")
-  sectionId              Int?                   @map("section_id")
-  name                   String                 @db.VarChar(100)
-  grade                  SchoolGrade?           @relation(fields: [gradeId], references: [id])
-  section                ClassSection?          @relation(fields: [sectionId], references: [id])
+  gradeId                Int                    @map("grade_id")
+  sectionId              Int                    @map("section_id")
+  name                   String                 @db.VarChar(32)
+  grade                  SchoolGrade            @relation(fields: [gradeId], references: [id])
+  section                ClassSection           @relation(fields: [sectionId], references: [id])
   exams                  Exam[]
   teacherAssignments     TeacherClassSubject[]
   examClassAssignments   ExamClassAssignment[]
