@@ -18,14 +18,14 @@ async function getCoordinatorStats() {
   ]);
 
   const recentExams = await prisma.$queryRaw<Array<{
-    id: number; title: string; status: string; created_at: Date; question_count: bigint;
-    total_quota: bigint; total_submitted: bigint;
+    id: number; title: string; status: string; created_at: Date; question_count: number;
+    total_quota: number; total_submitted: number;
   }>>`
     SELECT
       e.id, e.title, e.status, e.created_at,
-      (SELECT COUNT(*) FROM samba_edvance.questions q WHERE q.exam_id = e.id) AS question_count,
-      COALESCE((SELECT SUM(quota) FROM samba_edvance.exam_discipline_quotas edq WHERE edq.exam_id = e.id), 0) AS total_quota,
-      (SELECT COUNT(*) FROM samba_edvance.questions q WHERE q.exam_id = e.id) AS total_submitted
+      (SELECT COUNT(*) FROM samba_edvance.questions q WHERE q.exam_id = e.id)::int AS question_count,
+      COALESCE((SELECT SUM(quota) FROM samba_edvance.exam_discipline_quotas edq WHERE edq.exam_id = e.id), 0)::int AS total_quota,
+      (SELECT COUNT(*) FROM samba_edvance.questions q WHERE q.exam_id = e.id)::int AS total_submitted
     FROM samba_edvance.exams e
     ORDER BY e.created_at DESC
     LIMIT 6

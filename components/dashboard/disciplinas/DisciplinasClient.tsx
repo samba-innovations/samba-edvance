@@ -7,7 +7,7 @@ import { criarDisciplina, excluirDisciplina } from "@/lib/actions";
 import { toast } from "sonner";
 import { useConfirm } from "@/components/ConfirmDialog";
 
-type Disciplina = { id: number; name: string; item_count: bigint };
+type Disciplina = { id: number; name: string; item_count: number };
 type Skill      = { id: number; code: string; description: string; area: string | null; level: string | null };
 type Area       = { area: string; count: number };
 

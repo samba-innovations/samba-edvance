@@ -19,7 +19,7 @@ import { useConfirm } from "@/components/ConfirmDialog";
 
 type Simulado = {
   id: number; title: string; status: string; created_at: Date;
-  class_count: bigint; question_count: bigint; creator_name: string | null;
+  class_count: number; question_count: number; creator_name: string | null;
 };
 type ClassOpt = { id: number; name: string };
 type Disc = { id: number; name: string };

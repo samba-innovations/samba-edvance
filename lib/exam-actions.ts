@@ -614,12 +614,12 @@ export async function getSimuladoById(examId: number) {
 export async function getSimulados() {
   return prisma.$queryRaw<Array<{
     id: number; title: string; status: string; created_at: Date;
-    class_count: bigint; question_count: bigint; creator_name: string | null;
+    class_count: number; question_count: number; creator_name: string | null;
   }>>`
     SELECT
       e.id, e.title, e.status, e.created_at,
-      COUNT(DISTINCT eca.class_id) AS class_count,
-      COUNT(DISTINCT q.id) AS question_count,
+      COUNT(DISTINCT eca.class_id)::int AS class_count,
+      COUNT(DISTINCT q.id)::int AS question_count,
       u.name AS creator_name
     FROM samba_edvance.exams e
     LEFT JOIN samba_edvance.exam_class_assignments eca ON eca.exam_id = e.id

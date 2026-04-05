@@ -11,8 +11,8 @@ export type ActionResult = { success?: string; error?: string };
 // ─── Disciplinas ──────────────────────────────────────────────────────────────
 
 export async function getDisciplinas() {
-  return prisma.$queryRaw<Array<{ id: number; name: string; item_count: bigint }>>`
-    SELECT d.id, d.name, COUNT(i.id) AS item_count
+  return prisma.$queryRaw<Array<{ id: number; name: string; item_count: number }>>`
+    SELECT d.id, d.name, COUNT(i.id)::int AS item_count
     FROM samba_school.disciplines d
     LEFT JOIN samba_edvance.items i ON i.discipline_id = d.id
     GROUP BY d.id, d.name
@@ -340,13 +340,13 @@ export async function getSimulados() {
       created_at: Date;
       opened_at: Date | null;
       closed_at: Date | null;
-      question_count: bigint;
+      question_count: number;
       creator_name: string | null;
     }>
   >`
     SELECT
       e.id, e.title, e.status, e.created_at, e.opened_at, e.closed_at,
-      COUNT(eq.id) AS question_count,
+      COUNT(eq.id)::int AS question_count,
       u.name AS creator_name
     FROM samba_edvance.exams e
     LEFT JOIN samba_edvance.exam_questions eq ON eq.exam_id = e.id
@@ -511,13 +511,13 @@ export async function getMatrizes() {
       description: string | null;
       created_at: Date;
       owner_name: string | null;
-      exam_count: bigint;
+      exam_count: number;
     }>
   >`
     SELECT
       b.id, b.name, b.description, b.created_at,
       u.name AS owner_name,
-      COUNT(e.id) AS exam_count
+      COUNT(e.id)::int AS exam_count
     FROM samba_edvance.blueprints b
     LEFT JOIN samba_school.users u ON u.id = b.owner_id
     LEFT JOIN samba_edvance.exams e ON e.blueprint_id = b.id
@@ -568,12 +568,12 @@ export async function getTurmas() {
   return prisma.$queryRaw<Array<{
     id: number; name: string;
     grade_label: string; level: string; year_number: number;
-    student_count: bigint; discipline_count: bigint;
+    student_count: number; discipline_count: number;
   }>>`
     SELECT sc.id, sc.name,
            sg.label AS grade_label, sg.level, sg.year_number,
-           COUNT(DISTINCT st.id)  FILTER (WHERE st.is_active = true) AS student_count,
-           COUNT(DISTINCT cd.discipline_id) AS discipline_count
+           COUNT(DISTINCT st.id)  FILTER (WHERE st.is_active = true)::int AS student_count,
+           COUNT(DISTINCT cd.discipline_id)::int AS discipline_count
     FROM samba_school.school_classes sc
     LEFT JOIN samba_school.school_grades sg ON sg.id = sc.grade_id
     LEFT JOIN samba_school.students st ON st.class_id = sc.id

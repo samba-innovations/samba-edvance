@@ -42,7 +42,7 @@ interface Stats {
   totalMatrizes: number;
   recentExams: Array<{
     id: number; title: string; status: string; created_at: Date;
-    question_count: bigint; total_quota: bigint; total_submitted: bigint;
+    question_count: number; total_quota: number; total_submitted: number;
   }>;
   pendingProgress: Array<{
     exam_id: number; exam_title: string; teacher_name: string;

@@ -15,7 +15,7 @@ type Aluno = {
 };
 type Turma = {
   id: number; name: string; grade_label: string; level: string; year_number: number;
-  student_count: bigint; discipline_count: bigint;
+  student_count: number; discipline_count: number;
 };
 
 interface Props {

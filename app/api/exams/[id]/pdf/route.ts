@@ -77,7 +77,7 @@ export async function GET(req: NextRequest, { params }: Params) {
       `;
 
   // ── Busca opções de cada questão ──────────────────────────────────────────
-  const qIds = filteredRows.map((r) => r.id);
+  const qIds = filteredRows.map((r: { id: number }) => r.id);
   let optionRows: Array<{ question_id: number; label: string; text: string }> = [];
 
   if (qIds.length > 0) {

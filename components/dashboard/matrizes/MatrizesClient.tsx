@@ -15,7 +15,7 @@ type Matriz = {
   description: string | null;
   created_at: Date;
   owner_name: string | null;
-  exam_count: bigint;
+  exam_count: number;
 };
 
 type Disciplina = { id: number; name: string };
