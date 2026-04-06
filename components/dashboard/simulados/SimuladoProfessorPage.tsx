@@ -496,24 +496,37 @@ function DocxImport({ simulado, assignments, embedded }: DocxImportProps) {
 
       <div className={`${embedded ? "p-5" : "p-6"} space-y-4`}>
         {/* Drop zone */}
-        <div
-          className="border-2 border-dashed border-border rounded-xl p-6 text-center cursor-pointer hover:border-primary/50 hover:bg-primary/3 transition-all"
-          onClick={() => fileRef.current?.click()}>
-          <Upload size={24} className="mx-auto text-muted-foreground/40 mb-2" />
-          {fileName ? (
-            <p className="text-sm font-medium text-foreground">{fileName}</p>
-          ) : (
-            <>
-              <p className="text-sm font-medium text-foreground">Clique para selecionar um arquivo .docx</p>
-              <p className="text-xs text-muted-foreground mt-1">
-                Suporta fórmulas LaTeX (OMML) e imagens
-              </p>
-            </>
-          )}
-          {parsing && (
-            <div className="flex items-center justify-center gap-2 mt-3 text-xs text-muted-foreground">
-              <Loader2 size={13} className="animate-spin" /> Analisando arquivo...
-            </div>
+        <div className="relative">
+          <div
+            className="border-2 border-dashed border-border rounded-xl p-6 text-center cursor-pointer hover:border-primary/50 hover:bg-primary/3 transition-all"
+            onClick={() => fileRef.current?.click()}>
+            <Upload size={24} className="mx-auto text-muted-foreground/40 mb-2" />
+            {fileName ? (
+              <p className="text-sm font-medium text-foreground">{fileName}</p>
+            ) : (
+              <>
+                <p className="text-sm font-medium text-foreground">Clique para selecionar um arquivo .docx</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Suporta fórmulas LaTeX (OMML) e imagens
+                </p>
+              </>
+            )}
+            {parsing && (
+              <div className="flex items-center justify-center gap-2 mt-3 text-xs text-muted-foreground">
+                <Loader2 size={13} className="animate-spin" /> Analisando arquivo...
+              </div>
+            )}
+          </div>
+          {fileName && !parsing && !parsed && (
+            <button
+              type="button"
+              onClick={() => {
+                setFileName(null);
+                if (fileRef.current) fileRef.current.value = "";
+              }}
+              className="absolute top-2 right-2 w-6 h-6 flex items-center justify-center rounded-full bg-muted hover:bg-destructive/10 hover:text-destructive transition-colors text-muted-foreground">
+              <X size={12} />
+            </button>
           )}
         </div>
         <input
@@ -531,14 +544,26 @@ function DocxImport({ simulado, assignments, embedded }: DocxImportProps) {
               <p className="text-xs font-black text-muted-foreground uppercase tracking-wider">
                 {parsed.length} questão(ões) encontrada(s)
               </p>
-              <button type="button"
-                onClick={() => {
-                  if (selectedIdx.size === parsed.length) setSelectedIdx(new Set());
-                  else setSelectedIdx(new Set(parsed.map((_, i) => i)));
-                }}
-                className="text-[11px] font-bold text-primary hover:underline">
-                {selectedIdx.size === parsed.length ? "Desmarcar todas" : "Selecionar todas"}
-              </button>
+              <div className="flex items-center gap-3">
+                <button type="button"
+                  onClick={() => {
+                    if (selectedIdx.size === parsed.length) setSelectedIdx(new Set());
+                    else setSelectedIdx(new Set(parsed.map((_, i) => i)));
+                  }}
+                  className="text-[11px] font-bold text-primary hover:underline">
+                  {selectedIdx.size === parsed.length ? "Desmarcar todas" : "Selecionar todas"}
+                </button>
+                <button type="button"
+                  onClick={() => {
+                    setParsed(null);
+                    setSelectedIdx(new Set());
+                    setFileName(null);
+                    if (fileRef.current) fileRef.current.value = "";
+                  }}
+                  className="text-[11px] font-bold text-destructive hover:underline">
+                  Descartar
+                </button>
+              </div>
             </div>
             <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
               {parsed.map((q, i) => (
