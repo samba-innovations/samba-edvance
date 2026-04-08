@@ -186,8 +186,8 @@ function NovoSimuladoWizard({ onClose, allClasses, disciplinas, matrizes }: Wiza
   const unusedDiscs = disciplinas.filter((d) => !quotas.some((q) => q.disciplineId === d.id));
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-card border border-border rounded-3xl w-full max-w-2xl shadow-2xl max-h-[90vh] flex flex-col">
+    <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
+      <div className="bg-white dark:bg-[#0f2535] border border-border dark:border-[#1e3f55] rounded-3xl w-full max-w-2xl shadow-2xl dark:shadow-black/60 max-h-[90vh] flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between px-8 pt-7 pb-0 shrink-0">
           <h2 className="font-black text-xl text-foreground">Novo Simulado</h2>

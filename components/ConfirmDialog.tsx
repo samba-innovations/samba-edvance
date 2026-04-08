@@ -32,8 +32,8 @@ export function ConfirmDialog({
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
       onClick={(e) => { if (e.target === e.currentTarget) onCancel(); }}
     >
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
-      <div className="relative bg-card border border-border rounded-2xl shadow-xl w-full max-w-sm p-6 space-y-4 animate-in fade-in zoom-in-95 duration-150">
+      <div className="absolute inset-0 bg-black/70" />
+      <div className="relative bg-white dark:bg-[#0f2535] border border-border dark:border-[#1e3f55] rounded-2xl shadow-xl dark:shadow-black/60 w-full max-w-sm p-6 space-y-4 animate-in fade-in zoom-in-95 duration-150">
         <div className="flex items-start gap-3">
           <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${danger ? "bg-destructive/10" : "bg-primary/10"}`}>
             <AlertTriangle size={18} className={danger ? "text-destructive" : "text-primary"} />
