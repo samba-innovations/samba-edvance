@@ -5,9 +5,6 @@ import {
   LayoutDashboard,
   ClipboardList,
   LayoutTemplate,
-  BookOpen,
-  Users,
-  GraduationCap,
   LogOut,
   UserCircle,
   X,
@@ -172,51 +169,8 @@ export function Sidebar({ role, profile }: SidebarProps) {
               label="Matrizes"
               active={pathname.startsWith("/dashboard/matrizes")}
             />
-            {!isAdmin && (
-              <NavLink
-                href="/dashboard/turmas"
-                icon={Users}
-                label="Turmas"
-                active={pathname.startsWith("/dashboard/turmas")}
-              />
-            )}
           </nav>
         </div>
-
-        {/* Configurações (admin/coordinator) */}
-        {isAdmin && (
-          <div>
-            <p
-              className={`px-5 text-[10px] font-black text-muted-foreground/50 uppercase tracking-[0.2em] mb-4 transition-opacity duration-300 ${
-                isCollapsed
-                  ? "md:opacity-0 md:h-0 overflow-hidden"
-                  : "opacity-100"
-              }`}
-            >
-              Configurações
-            </p>
-            <nav className="space-y-1">
-              <NavLink
-                href="/dashboard/disciplinas"
-                icon={BookOpen}
-                label="Disciplinas"
-                active={pathname.startsWith("/dashboard/disciplinas")}
-              />
-              <NavLink
-                href="/dashboard/turmas"
-                icon={Users}
-                label="Turmas"
-                active={pathname.startsWith("/dashboard/turmas")}
-              />
-              <NavLink
-                href="/dashboard/alunos"
-                icon={GraduationCap}
-                label="Alunos"
-                active={pathname.startsWith("/dashboard/alunos")}
-              />
-            </nav>
-          </div>
-        )}
       </div>
 
       {/* Footer */}
